@@ -20,5 +20,5 @@ extern const uint32_t ANCHORS[4][2];
 */
 void position_trilateration(uint64_t* dist, int64_t* pos);
 
-void position_ols(uint64_t* dist, uint64_t* pos);
-void position_fgls(uint64_t* dist, uint64_t* pos);
+int position_ols(uint64_t* dist, uint64_t* pos);
+int position_fgls(uint64_t* dist, uint64_t* pos);
