@@ -31,7 +31,7 @@ void matmat_mult(const double* mat1, const uint8_t mat1_rows, const uint8_t mat1
 }
 
 int mat2_inv(const double* mat, double* output) {
-    const double* det = mat[0]*mat[3] - mat[1]*mat[2];
+    const double det = mat[0]*mat[3] - mat[1]*mat[2];
     if (det < EPS && det > -EPS)
         return -1;
 
@@ -45,23 +45,27 @@ int mat2_inv(const double* mat, double* output) {
 
 /********** LIBRARY FUNCTIONS **********/
 
-void position_trilateration(uint64_t* dist, int32_t* pos) {
+int position_trilateration(uint16_t* dist, double* pos) {
     // Use the matrix of cofactors to compute the inverse of the edges matrix E
-    static const int64_t edges_det =
-        (ANCHORS[0][0] - ANCHORS[1][0])*(ANCHORS[0][1] - ANCHORS[2][1])
-        - (ANCHORS[0][0] - ANCHORS[2][0])*(ANCHORS[0][1] - ANCHORS[1][1]);
+    static const double edges_det =
+        (anchor_pos[0][0] - anchor_pos[1][0])*(anchor_pos[0][1] - anchor_pos[2][1])
+        - (anchor_pos[0][0] - anchor_pos[2][0])*(anchor_pos[0][1] - anchor_pos[1][1]);
+
+    if (edges_det < EPS && edges_det > -EPS)
+        return -1;
+    
     static const double edges_inv[] = {
-        (double)(ANCHORS[0][1] - ANCHORS[2][1]) / det,
-        -(double)(ANCHORS[0][1] - ANCHORS[1][1]) / det,
-        -(double)(ANCHORS[0][0] - ANCHORS[2][0]) / det,
-        (double)(ANCHORS[0][0] - ANCHORS[1][0]) / det
+        (anchor_pos[0][1] - anchor_pos[2][1]) / edges_det,
+        -(anchor_pos[0][1] - anchor_pos[1][1]) / edges_det,
+        -(anchor_pos[0][0] - anchor_pos[2][0]) / edges_det,
+        (anchor_pos[0][0] - anchor_pos[1][0]) / edges_det
     };
 
     // Compute the vector of coefficients y
     static const double norms_sq[] = {
-        ANCHORS[0][0]*ANCHORS[0][0] + ANCHORS[0][1]*ANCHORS[0][1],
-        ANCHORS[1][0]*ANCHORS[1][0] + ANCHORS[1][1]*ANCHORS[1][1],
-        ANCHORS[2][0]*ANCHORS[2][0] + ANCHORS[2][1]*ANCHORS[2][1]
+        anchor_pos[0][0]*anchor_pos[0][0] + anchor_pos[0][1]*anchor_pos[0][1],
+        anchor_pos[1][0]*anchor_pos[1][0] + anchor_pos[1][1]*anchor_pos[1][1],
+        anchor_pos[2][0]*anchor_pos[2][0] + anchor_pos[2][1]*anchor_pos[2][1]
     };
     const double coeffs[] = {
         (dist[0]*dist[0] - dist[1]*dist[1] + norms_sq[1] - norms_sq[0]) / 2,
@@ -70,23 +74,24 @@ void position_trilateration(uint64_t* dist, int32_t* pos) {
 
     // Estimate the target as E^{1}y
     matvec_mult(edges_inv, 2, 2, coeffs, pos);
+    return 0;
 }
 
-int position_ols(uint64_t* dist, uint64_t* pos) {
+int position_ols(uint16_t* dist, double* pos) {
     static const double edges[] = {
-        ANCHORS[0][0] - ANCHORS[1][0],
-        ANCHORS[0][1] - ANCHORS[1][1],
-        ANCHORS[0][0] - ANCHORS[2][0],
-        ANCHORS[0][1] - ANCHORS[2][1],
-        ANCHORS[0][0] - ANCHORS[3][0],
-        ANCHORS[0][1] - ANCHORS[3][1],
+        anchor_pos[0][0] - anchor_pos[1][0],
+        anchor_pos[0][1] - anchor_pos[1][1],
+        anchor_pos[0][0] - anchor_pos[2][0],
+        anchor_pos[0][1] - anchor_pos[2][1],
+        anchor_pos[0][0] - anchor_pos[3][0],
+        anchor_pos[0][1] - anchor_pos[3][1],
     }, edges_transpose[] = {
-        ANCHORS[0][0] - ANCHORS[1][0],
-        ANCHORS[0][0] - ANCHORS[2][0],
-        ANCHORS[0][0] - ANCHORS[3][0],
-        ANCHORS[0][1] - ANCHORS[1][1],
-        ANCHORS[0][1] - ANCHORS[2][1],
-        ANCHORS[0][1] - ANCHORS[3][1],
+        anchor_pos[0][0] - anchor_pos[1][0],
+        anchor_pos[0][0] - anchor_pos[2][0],
+        anchor_pos[0][0] - anchor_pos[3][0],
+        anchor_pos[0][1] - anchor_pos[1][1],
+        anchor_pos[0][1] - anchor_pos[2][1],
+        anchor_pos[0][1] - anchor_pos[3][1],
     };
 
     // Compute the necessary matrices
@@ -101,10 +106,10 @@ int position_ols(uint64_t* dist, uint64_t* pos) {
 
     // Compute the vectors of coefficients
     static const double norms_sq[] = {
-        ANCHORS[0][0]*ANCHORS[0][0] + ANCHORS[0][1]*ANCHORS[0][1],
-        ANCHORS[1][0]*ANCHORS[1][0] + ANCHORS[1][1]*ANCHORS[1][1],
-        ANCHORS[2][0]*ANCHORS[2][0] + ANCHORS[2][1]*ANCHORS[2][1],
-        ANCHORS[3][0]*ANCHORS[3][0] + ANCHORS[3][1]*ANCHORS[3][1],
+        anchor_pos[0][0]*anchor_pos[0][0] + anchor_pos[0][1]*anchor_pos[0][1],
+        anchor_pos[1][0]*anchor_pos[1][0] + anchor_pos[1][1]*anchor_pos[1][1],
+        anchor_pos[2][0]*anchor_pos[2][0] + anchor_pos[2][1]*anchor_pos[2][1],
+        anchor_pos[3][0]*anchor_pos[3][0] + anchor_pos[3][1]*anchor_pos[3][1],
     };
     const double coeffs[] = {
         (dist[0]*dist[0] - dist[1]*dist[1] + norms_sq[1] - norms_sq[0]) / 2,
@@ -113,9 +118,10 @@ int position_ols(uint64_t* dist, uint64_t* pos) {
     };
 
     // Estimate the target as (E^T E)^{-1} E^T y
-    matvec_mult(full_matrx, 2, 3, coeffs, pos);
+    matvec_mult(full_matrix, 2, 3, coeffs, pos);
+    return 0;
 }
 
-void position_fgls(uint64_t* dist, uint64_t* pos) {
+void position_fgls(uint16_t* dist, uint64_t* pos) {
 
 }
