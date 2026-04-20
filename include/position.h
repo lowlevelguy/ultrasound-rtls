@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-extern const double anchor_pos[4][2];
+extern const float anchor_pos[4][2];
 
 /** @brief Performs trilateration to estimate the position of the target.
   *
@@ -31,7 +31,7 @@ extern const double anchor_pos[4][2];
   * Returns 0 on success, and -1 if E is non-invertible, meaning that the anchors
   * are collinear.
 */
-int position_trilateration(uint16_t* dist, double* pos);
+int position_trilateration(const uint16_t* dist, float* pos);
 
 /** @brief Performs linear ordinary least squares to estimate the position of
   * the target.
@@ -61,7 +61,7 @@ int position_trilateration(uint16_t* dist, double* pos);
   * Returns 0 on success, and -1 if (E^T E) is non-invertible, meaning
   * that the condition of three of the anchors being non-collinear is unfulfilled.
   */
-int position_ols(uint16_t* dist, double* pos);
+int position_ols(const uint16_t* dist, float* pos);
 
 /** @brief Performs linear feasible generalized least squares to estimate the
   * position of the target.
@@ -105,4 +105,4 @@ int position_ols(uint16_t* dist, double* pos);
   * Returns 0 on success, and -1 if (E^T P^{-1} E) is non-invertible, meaning
   * that the condition of three of the anchors being non-collinear is unfulfilled.
   */
-int position_fgls(uint16_t* dist, double* pos);
+int position_fgls(const uint16_t* dist, float* pos);
