@@ -93,7 +93,7 @@ int position_ols(const uint16_t* dist, float* pos);
   * As for estimating s**2, we first invoke position_ols() to obtain an estimate
   * \tilde{x} on the target's position. Our estimator \hat{s}**2 for s**2 is
   * then given by:
-  *     \hat{s}**2 = \sum{(dist[k] - norm(\tilde{x} - anchor_pos[k]))**2} / 2
+  *     \hat{s}**2 = \sum{(dist[k] - norm(\tilde{x} - anchor_pos[k]))**2} / 4
   * where we use norm(u) to denote the norm of the vector u.
   * 
   * @param dist: array containing the distances from the target to each anchor

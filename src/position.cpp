@@ -201,7 +201,7 @@ int position_fgls(const uint16_t *dist, float *pos) {
         sigma_sq += dist[i] - sqrtf(
             (pos[0] - anchor_pos[i][0])*(pos[0] - anchor_pos[i][0])
             + (pos[1] - anchor_pos[i][1])*(pos[1] - anchor_pos[i][1]));
-    sigma_sq /= 2;
+    sigma_sq /= 4;
 
     // Estimate P^{-1}
     const float cov[] = {
