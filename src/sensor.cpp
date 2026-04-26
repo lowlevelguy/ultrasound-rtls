@@ -5,6 +5,12 @@ int init_sensor(int sensor_index, int uart_index, int baud_rate, int RX, int TX)
     if(sensor_index < 0 || sensor_index >= 4) {
         return 0;
     }
+
+    if(SENSORS[sensor_index] != NULL) {
+        delete SENSORS[sensor_index];
+        SENSORS[sensor_index] = NULL;
+    }
+
     SENSORS[sensor_index] = new HardwareSerial(uart_index);
     // initialize the sensor at the given index 
     //with the specified baud rate and RX/TX pins
