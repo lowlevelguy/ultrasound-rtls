@@ -1,17 +1,11 @@
 #include "sensor.h"
 
-int define_uart_port(int sensor_index, int uart_index) {
-    if(sensor_index < 0 || sensor_index >= 4) return 0;
-    SENSORS[sensor_index] = new HardwareSerial(uart_index);
-    return 1;
-}
-
-int init_sensor(int sensor_index, int baud_rate, int RX, int TX) {
+int init_sensor(int sensor_index, int uart_index, int baud_rate, int RX, int TX) {
     //input validation
     if(sensor_index < 0 || sensor_index >= 4) {
         return 0;
     }
-
+    SENSORS[sensor_index] = new HardwareSerial(uart_index);
     // initialize the sensor at the given index 
     //with the specified baud rate and RX/TX pins
     if (SENSORS[sensor_index] == NULL) {
@@ -27,19 +21,19 @@ int init_sensor(int sensor_index, int baud_rate, int RX, int TX) {
 uint16_t read_sensor(int sensor_index) {
     //input validation 
     if (sensor_index < 0 || sensor_index >= 4) {
-        return 0; 
+        return -1; 
     }
 
     //initialize buffer for sensor reading
     uint8_t buffer[4];
     if(SENSORS[sensor_index] == NULL) {
-        return 0;
+        return -1;
     }
 
     //trigger the sensor
     //according to the sheet of the sensor model AJ-SR04M, you have to send
     //the value 0x01 to its uart port to trigger it to send its measurement
-    SENSORS[sensor_index]->write(0x01);
+    SENSORS[sensor_index]->write(SENSOR_TRIGGER_BYTE);
 
     //sensor has multiple modes of operation, we chose to use the mode 4
     // in this mode , when triggered the sensor sends 32 bits of data
@@ -49,7 +43,7 @@ uint16_t read_sensor(int sensor_index) {
     unsigned long start = millis();
     while (SENSORS[sensor_index]->available() < 4) {
         if((millis() - start) > MAX_WAIT_TIME) {
-            return 0;
+            return -1;
         }
     }
     
@@ -62,11 +56,11 @@ uint16_t read_sensor(int sensor_index) {
         uint8_t checksum = (uint8_t)(((uint16_t)low_bytes + high_bytes) & 0xFF);
         
         if(checksum != buffer[3]) {
-            return 0;
+            return -1;
         }
         uint16_t distance = (uint16_t)(high_bytes << 8) | low_bytes;
         return distance; 
     
     }
-    return 0;
+    return -1;
 }
