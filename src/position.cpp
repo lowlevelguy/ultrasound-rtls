@@ -1,7 +1,11 @@
 #include "position.h"
+#include <string.h>
 #include <math.h>
 
-#define EPS 1e-6f
+#define EPS_DET 1e-6f
+#define EPS_GN  1e-6f
+#define STEP_GN 1e-4f
+#define MAX_ITERATIONS_GN 5
 
 /********** HELPER FUNCTIONS **********/
 
@@ -56,16 +60,16 @@ void matmat_mult(const float *mat1, const uint8_t mat1_rows, const uint8_t mat1_
     }
 }
 
-/** @brief Computes the inverse of the 3*3 matrix mat when possible, and writes
+/** @brief Computes the inverse of the 2*2 matrix mat when possible, and writes
   * the inverse to output.
   *
-  * @param mat: the 3*3 matrix to invert, in row-major order.
+  * @param mat: the 2*2 matrix to invert, in row-major order.
   * @param output: buffer to contain the inverse matrix.
-  * @return Returns 0 if the matrix is invertible, -1 if not (i.e., |det| < EPS).
+  * @return Returns 0 if the matrix is invertible, -1 if not (i.e., |det| < EPS_DET).
   */
 int mat2_inv(const float *mat, float *output) {
     const float det = mat[0] * mat[3] - mat[1] * mat[2];
-    if (det < EPS && det > -EPS)
+    if (det < EPS_DET && det > -EPS_DET)
         return -1;
 
     output[0] = mat[3] / det;
@@ -75,11 +79,18 @@ int mat2_inv(const float *mat, float *output) {
     return 0;
 }
 
+/** @brief Computes the inverse of the 3*3 matrix mat when possible, and writes
+  * the inverse to output.
+  *
+  * @param mat: the 3*3 matrix to invert, in row-major order.
+  * @param output: buffer to contain the inverse matrix.
+  * @return Returns 0 if the matrix is invertible, -1 if not (i.e., |det| < EPS_DET).
+  */
 int mat3_inv(const float *mat, float *output) {
     const float det = mat[0] * (mat[4] * mat[8] - mat[5] * mat[7])
         - mat[1] * (mat[3] * mat[8] - mat[5] * mat[6])
         + mat[2] * (mat[3] * mat[7] - mat[4] * mat[6]);
-    if (det < EPS && det > -EPS)
+    if (det < EPS_DET && det > -EPS_DET)
         return -1;
 
     output[0] = (mat[4]*mat[8] - mat[5]*mat[7]) / det;
@@ -95,6 +106,71 @@ int mat3_inv(const float *mat, float *output) {
     return 0;
 }
 
+/** @brief Uses Gauss-Newton iterations to minimize the norm squared of the
+  * mathematical function R^2 -> R^4, implemented in C as a void-valued function
+  * taking two parameters: a 2-sized array of input floats, and a 4-sized
+  * buffer for the output. The argmin is written to the 2-sized buffer min.
+  *
+  * @param f: pointer to a void-returning function taking a 2-sized array of
+  * floats as first parameter, and a 4-sized array of floats as second parameter.
+  * @param min: 2-sized buffer that initially contains
+  */
+int gauss_newton(void (*f)(const float*, float*), float* result) {
+    float point[2] = {0}, point_shift[2],
+        val[4], val_shift[4], val_tf[4],
+        J[4*2], Jt[2*4], JtJ[2*2], JtJ_inv[2*2], full_matrix[2*4],
+        norm_sq;
+
+    f(point, val);
+    norm_sq = val[0]*val[0] + val[1]*val[1] + val[2]*val[2] + val[3]*val[3];
+    for (int i = 0; i < MAX_ITERATIONS_GN && norm_sq >= EPS_GN; i++) {
+        // Compute Jacobian and its tranpose
+        point_shift[0] = point[0] + STEP_GN;
+        point_shift[1] = point[1];
+        f(point_shift, val_shift);
+        J[0] = (val_shift[0] - val[0]) / STEP_GN;
+        J[2] = (val_shift[1] - val[1]) / STEP_GN;
+        J[4] = (val_shift[2] - val[2]) / STEP_GN;
+        J[6] = (val_shift[3] - val[3]) / STEP_GN;
+        Jt[0] = (val_shift[0] - val[0]) / STEP_GN;
+        Jt[1] = (val_shift[1] - val[1]) / STEP_GN;
+        Jt[2] = (val_shift[2] - val[2]) / STEP_GN;
+        Jt[3] = (val_shift[3] - val[3]) / STEP_GN;
+
+        point_shift[0] = point[0];
+        point_shift[1] = point[1] + STEP_GN;
+        f(point_shift, val_shift);
+        J[1] = (val_shift[0] - val[0]) / STEP_GN;
+        J[3] = (val_shift[1] - val[1]) / STEP_GN;
+        J[5] = (val_shift[2] - val[2]) / STEP_GN;
+        J[7] = (val_shift[3] - val[3]) / STEP_GN;
+        Jt[4] = (val_shift[0] - val[0]) / STEP_GN;
+        Jt[5] = (val_shift[1] - val[1]) / STEP_GN;
+        Jt[6] = (val_shift[2] - val[2]) / STEP_GN;
+        Jt[7] = (val_shift[3] - val[3]) / STEP_GN;
+
+        // Compute (J^T J)^{-1}
+        matmat_mult(Jt, 2, 4, J, 2, JtJ);
+        if (mat2_inv(JtJ, JtJ_inv) == -1)
+            return -1;
+
+        // Compute (J^T J)^{-1} J^T and right-multiply it by f(point)
+        matmat_mult(JtJ_inv, 2, 2, Jt, 4, full_matrix);
+        matvec_mult(full_matrix, 2, 4, val, val_tf);
+
+        // Update point
+        point[0] -= val_tf[0];
+        point[1] -= val_tf[1];
+
+        f(point, val);
+        norm_sq = val[0]*val[0] + val[1]*val[1] + val[2]*val[2] + val[3]*val[3];
+    }
+
+    result[0] = point[0];
+    result[1] = point[1];
+    return 0;
+}
+
 
 /********** LIBRARY FUNCTIONS **********/
 
@@ -104,7 +180,7 @@ int position_trilateration(const uint16_t *dist, float *pos) {
             (anchor_pos[0][0] - anchor_pos[1][0]) * (anchor_pos[0][1] - anchor_pos[2][1])
             - (anchor_pos[0][0] - anchor_pos[2][0]) * (anchor_pos[0][1] - anchor_pos[1][1]);
 
-    if (edges_det < EPS && edges_det > -EPS)
+    if (edges_det < EPS_DET && edges_det > -EPS_DET)
         return -1;
 
     static const float edges_inv[] = {
@@ -244,5 +320,29 @@ int position_fgls(const uint16_t *dist, float *pos) {
 
     // Estimate the target as (E^T P E)^{-1} E^T P y
     matvec_mult(full_matrix, 2, 3, coeffs, pos);
+    return 0;
+}
+
+void compute_dist(const float* pos, float* d) {
+    d[0] = (pos[0] - anchor_pos[0][0])*(pos[0] - anchor_pos[0][0])
+         + (pos[1] - anchor_pos[0][1])*(pos[1] - anchor_pos[0][1]);
+    d[0] = sqrtf(d[0]);
+
+    d[1] = (pos[0] - anchor_pos[1][0])*(pos[0] - anchor_pos[1][0])
+         + (pos[1] - anchor_pos[1][1])*(pos[1] - anchor_pos[1][1]);
+    d[1] = sqrtf(d[1]);
+
+    d[2] = (pos[0] - anchor_pos[2][0])*(pos[0] - anchor_pos[2][0])
+         + (pos[1] - anchor_pos[2][1])*(pos[1] - anchor_pos[2][1]);
+    d[2] = sqrtf(d[2]);
+
+    d[3] = (pos[0] - anchor_pos[3][0])*(pos[0] - anchor_pos[3][0])
+         + (pos[1] - anchor_pos[3][1])*(pos[1] - anchor_pos[3][1]);
+    d[3] = sqrtf(d[3]);
+}
+
+int position_mle(const uint16_t* dist, float* pos) {
+    if (gauss_newton(compute_dist, pos) == -1)
+        return -1;
     return 0;
 }

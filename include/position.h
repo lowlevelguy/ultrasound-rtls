@@ -106,3 +106,6 @@ int position_ols(const uint16_t* dist, float* pos);
   * that the condition of three of the anchors being non-collinear is unfulfilled.
   */
 int position_fgls(const uint16_t* dist, float* pos);
+
+int position_irls(const uint16_t* dist, float* pos);
+int position_mle(const uint16_t* dist, float* pos);
