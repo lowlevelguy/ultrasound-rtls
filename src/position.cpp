@@ -106,71 +106,6 @@ int mat3_inv(const float *mat, float *output) {
     return 0;
 }
 
-/** @brief Uses Gauss-Newton iterations to minimize the norm squared of the
-  * mathematical function R^2 -> R^4, implemented in C as a void-valued function
-  * taking two parameters: a 2-sized array of input floats, and a 4-sized
-  * buffer for the output. The argmin is written to the 2-sized buffer min.
-  *
-  * @param f: pointer to a void-returning function taking a 2-sized array of
-  * floats as first parameter, and a 4-sized array of floats as second parameter.
-  * @param min: 2-sized buffer that initially contains
-  */
-int gauss_newton(void (*f)(const float*, float*), float* result) {
-    float point[2] = {0}, point_shift[2],
-        val[4], val_shift[4], val_tf[4],
-        J[4*2], Jt[2*4], JtJ[2*2], JtJ_inv[2*2], full_matrix[2*4],
-        norm_sq;
-
-    f(point, val);
-    norm_sq = val[0]*val[0] + val[1]*val[1] + val[2]*val[2] + val[3]*val[3];
-    for (int i = 0; i < MAX_ITERATIONS_GN && norm_sq >= EPS_GN; i++) {
-        // Compute Jacobian and its tranpose
-        point_shift[0] = point[0] + STEP_GN;
-        point_shift[1] = point[1];
-        f(point_shift, val_shift);
-        J[0] = (val_shift[0] - val[0]) / STEP_GN;
-        J[2] = (val_shift[1] - val[1]) / STEP_GN;
-        J[4] = (val_shift[2] - val[2]) / STEP_GN;
-        J[6] = (val_shift[3] - val[3]) / STEP_GN;
-        Jt[0] = (val_shift[0] - val[0]) / STEP_GN;
-        Jt[1] = (val_shift[1] - val[1]) / STEP_GN;
-        Jt[2] = (val_shift[2] - val[2]) / STEP_GN;
-        Jt[3] = (val_shift[3] - val[3]) / STEP_GN;
-
-        point_shift[0] = point[0];
-        point_shift[1] = point[1] + STEP_GN;
-        f(point_shift, val_shift);
-        J[1] = (val_shift[0] - val[0]) / STEP_GN;
-        J[3] = (val_shift[1] - val[1]) / STEP_GN;
-        J[5] = (val_shift[2] - val[2]) / STEP_GN;
-        J[7] = (val_shift[3] - val[3]) / STEP_GN;
-        Jt[4] = (val_shift[0] - val[0]) / STEP_GN;
-        Jt[5] = (val_shift[1] - val[1]) / STEP_GN;
-        Jt[6] = (val_shift[2] - val[2]) / STEP_GN;
-        Jt[7] = (val_shift[3] - val[3]) / STEP_GN;
-
-        // Compute (J^T J)^{-1}
-        matmat_mult(Jt, 2, 4, J, 2, JtJ);
-        if (mat2_inv(JtJ, JtJ_inv) == -1)
-            return -1;
-
-        // Compute (J^T J)^{-1} J^T and right-multiply it by f(point)
-        matmat_mult(JtJ_inv, 2, 2, Jt, 4, full_matrix);
-        matvec_mult(full_matrix, 2, 4, val, val_tf);
-
-        // Update point
-        point[0] -= val_tf[0];
-        point[1] -= val_tf[1];
-
-        f(point, val);
-        norm_sq = val[0]*val[0] + val[1]*val[1] + val[2]*val[2] + val[3]*val[3];
-    }
-
-    result[0] = point[0];
-    result[1] = point[1];
-    return 0;
-}
-
 
 /********** LIBRARY FUNCTIONS **********/
 
@@ -323,26 +258,81 @@ int position_fgls(const uint16_t *dist, float *pos) {
     return 0;
 }
 
-void compute_dist(const float* pos, float* d) {
-    d[0] = (pos[0] - anchor_pos[0][0])*(pos[0] - anchor_pos[0][0])
+void dist_err(const float* pos, const uint16_t* measured, float* err) {
+    err[0] = (pos[0] - anchor_pos[0][0])*(pos[0] - anchor_pos[0][0])
          + (pos[1] - anchor_pos[0][1])*(pos[1] - anchor_pos[0][1]);
-    d[0] = sqrtf(d[0]);
+    err[0] = sqrtf(err[0]);
+    err[0] -= measured[0];
 
-    d[1] = (pos[0] - anchor_pos[1][0])*(pos[0] - anchor_pos[1][0])
+    err[1] = (pos[0] - anchor_pos[1][0])*(pos[0] - anchor_pos[1][0])
          + (pos[1] - anchor_pos[1][1])*(pos[1] - anchor_pos[1][1]);
-    d[1] = sqrtf(d[1]);
+    err[1] = sqrtf(err[1]);
+    err[1] -= measured[1];
 
-    d[2] = (pos[0] - anchor_pos[2][0])*(pos[0] - anchor_pos[2][0])
+    err[2] = (pos[0] - anchor_pos[2][0])*(pos[0] - anchor_pos[2][0])
          + (pos[1] - anchor_pos[2][1])*(pos[1] - anchor_pos[2][1]);
-    d[2] = sqrtf(d[2]);
+    err[2] = sqrtf(err[2]);
+    err[2] -= measured[2];
 
-    d[3] = (pos[0] - anchor_pos[3][0])*(pos[0] - anchor_pos[3][0])
+    err[3] = (pos[0] - anchor_pos[3][0])*(pos[0] - anchor_pos[3][0])
          + (pos[1] - anchor_pos[3][1])*(pos[1] - anchor_pos[3][1]);
-    d[3] = sqrtf(d[3]);
+    err[3] = sqrtf(err[3]);
+    err[3] -= measured[3];
 }
 
 int position_mle(const uint16_t* dist, float* pos) {
-    if (gauss_newton(compute_dist, pos) == -1)
-        return -1;
+    // Perform Gauss-Newton to find the point with minimal squared error
+    float point[2] = {0}, point_shift[2],
+        val[4], val_shift[4], val_tf[4],
+        J[4*2], Jt[2*4], JtJ[2*2], JtJ_inv[2*2], full_matrix[2*4],
+        norm_sq;
+
+    dist_err(point, dist, val);
+    norm_sq = val[0]*val[0] + val[1]*val[1] + val[2]*val[2] + val[3]*val[3];
+    for (int i = 0; i < MAX_ITERATIONS_GN && norm_sq >= EPS_GN; i++) {
+        // Compute Jacobian and its transpose
+        point_shift[0] = point[0] + STEP_GN;
+        point_shift[1] = point[1];
+        dist_err(point_shift, dist, val_shift);
+        J[0] = (val_shift[0] - val[0]) / STEP_GN;
+        J[2] = (val_shift[1] - val[1]) / STEP_GN;
+        J[4] = (val_shift[2] - val[2]) / STEP_GN;
+        J[6] = (val_shift[3] - val[3]) / STEP_GN;
+        Jt[0] = (val_shift[0] - val[0]) / STEP_GN;
+        Jt[1] = (val_shift[1] - val[1]) / STEP_GN;
+        Jt[2] = (val_shift[2] - val[2]) / STEP_GN;
+        Jt[3] = (val_shift[3] - val[3]) / STEP_GN;
+
+        point_shift[0] = point[0];
+        point_shift[1] = point[1] + STEP_GN;
+        dist_err(point_shift, dist, val_shift);
+        J[1] = (val_shift[0] - val[0]) / STEP_GN;
+        J[3] = (val_shift[1] - val[1]) / STEP_GN;
+        J[5] = (val_shift[2] - val[2]) / STEP_GN;
+        J[7] = (val_shift[3] - val[3]) / STEP_GN;
+        Jt[4] = (val_shift[0] - val[0]) / STEP_GN;
+        Jt[5] = (val_shift[1] - val[1]) / STEP_GN;
+        Jt[6] = (val_shift[2] - val[2]) / STEP_GN;
+        Jt[7] = (val_shift[3] - val[3]) / STEP_GN;
+
+        // Compute (J^T J)^{-1}
+        matmat_mult(Jt, 2, 4, J, 2, JtJ);
+        if (mat2_inv(JtJ, JtJ_inv) == -1)
+            return -1;
+
+        // Compute (J^T J)^{-1} J^T and right-multiply it by f(point)
+        matmat_mult(JtJ_inv, 2, 2, Jt, 4, full_matrix);
+        matvec_mult(full_matrix, 2, 4, val, val_tf);
+
+        // Update point
+        point[0] -= val_tf[0];
+        point[1] -= val_tf[1];
+
+        dist_err(point, dist, val);
+        norm_sq = val[0]*val[0] + val[1]*val[1] + val[2]*val[2] + val[3]*val[3];
+    }
+
+    pos[0] = point[0];
+    pos[1] = point[1];
     return 0;
 }

@@ -108,4 +108,26 @@ int position_ols(const uint16_t* dist, float* pos);
 int position_fgls(const uint16_t* dist, float* pos);
 
 int position_irls(const uint16_t* dist, float* pos);
+
+/** @brief Numerically estimates the Maximum Likelihood estimator for the
+  * target's position, assuming homoscedasticity.
+  *
+  * @details
+  * Numerically estimates the Maximum Likelihood Estimator for the target's
+  * position, assuming homoscedastic noise, using Guass-Newton iterations to
+  * minimize the loss function:
+  *     L(x) = norm_sq(d(x) - dist)
+  * where we use norm_sq(u) to denote the norm squared of the vector u, and d(x)
+  * to denote the array of distances from the point x to the anchors:
+  *     d(x)[k] = norm(x - anchor_pos[k])
+  *
+  * @param dist: array containing the distances from the target to each anchor
+  * in mm.
+  * @param pos: array that will contain the estimated position of the target,
+  * each coordinate in mm.
+  *
+  * @return
+  * Returns 0 on success, and -1 if (J^T J) is non-invertible, where J is the
+  * Jacobian of the function (d(x) - dist).
+  */
 int position_mle(const uint16_t* dist, float* pos);
