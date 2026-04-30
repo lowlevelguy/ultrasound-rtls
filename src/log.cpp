@@ -1,7 +1,7 @@
 #include "log.h"
 #include <LittleFS.h>
 
-static log_queue_t log_queue[QUEUE_SIZE];
+static log_queue_entry_t log_queue[QUEUE_SIZE];
 static int queue_index = 0;
 
 int initialize_log_file(fs::FS &fs) {
