@@ -30,7 +30,7 @@ static void sensor_read_bytes(SerialHandle_t* s, uint8_t* buffer, size_t len) {
 
 int init_sensor(int sensor_index, SerialHandle_t* handle, int baud_rate, int RX, int TX) {
     if (sensor_index < 0 || sensor_index >= MAX_SENSORS) return -1;
-    if (handle == NULL)                                   return -1;
+    if (handle == NULL) return -1;
 
     SENSORS[sensor_index] = handle;
 
