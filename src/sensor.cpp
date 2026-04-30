@@ -1,4 +1,6 @@
 #include "sensor.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 HardwareSerial *SENSORS[MAX_SENSORS];
 
 
@@ -53,6 +55,7 @@ int32_t read_sensor(int sensor_index) {
         if((millis() - start) > MAX_WAIT_TIME_MS) {
             return -1;
         }
+        vTaskDelay(1);
     }
     
     SENSORS[sensor_index]->readBytes(buffer, 4);
