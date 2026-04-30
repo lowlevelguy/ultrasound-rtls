@@ -3,7 +3,6 @@
 #include "freertos/task.h"
 HardwareSerial *SENSORS[MAX_SENSORS];
 
-
 int init_sensor(int sensor_index, int uart_index, int baud_rate, int RX, int TX) {
     //input validation
     if(sensor_index < 0 || sensor_index >= MAX_SENSORS) {
