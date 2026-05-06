@@ -86,16 +86,13 @@ int position_ols(const uint16_t* dist, float* pos);
   * between the target and anchor_pos[k], and s**2 the variance of the noise
   * in the distance measurements.
   * 
-  * Given that both d[k]**2 and s**2 are unknowns, we estimate them, and use
-  * their estimators to construct an estimator for P, which will be further
+  * Given that all d[k]**2 values are unknown, we estimate them with dist[k]**2
+  * instead, in order to construct an estimator for P, which will be further
   * used to construct an estimator for the target.
-  * The simplest estimator for d[k]**2, and the one which we use, is dist[k]**2.
-  * As for estimating s**2, we first invoke position_ols() to obtain an estimate
-  * \tilde{x} on the target's position. Our estimator \hat{s}**2 for s**2 is
-  * then given by:
-  *     \hat{s}**2 = \sum{(dist[k] - norm(\tilde{x} - anchor_pos[k]))**2} / 4
-  * where we use norm(u) to denote the norm of the vector u.
-  * 
+  * Of course, the estimator \hat{P} for P is given by:
+  *     \hat{P}[i,j] = s**4 / 2  + (s * dist[0])**2               (i != j)
+  *     \hat{P}[i,i] = s**4 + s**2 * (dist[0]**2 + dist[i]**2)
+  *
   * @param dist: array containing the distances from the target to each anchor
   * in mm.
   * @param pos: array that will contain the estimated position of the target,
@@ -105,11 +102,11 @@ int position_ols(const uint16_t* dist, float* pos);
   * Returns 0 on success, and -1 if (E^T P^{-1} E) is non-invertible, meaning
   * that the condition of three of the anchors being non-collinear is unfulfilled.
   */
-int position_fgls(const uint16_t* dist, float* pos);
+int position_fgls(const uint16_t* dist, const float sigma_sq, float* pos);
 
 int position_irls(const uint16_t* dist, float* pos);
 
-/** @brief Numerically estimates the Maximum Likelihood estimator for the
+/** @brief Numerically estimates the Maximum Likelihood Estimator for the
   * target's position, assuming homoscedasticity.
   *
   * @details

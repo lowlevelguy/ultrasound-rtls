@@ -106,6 +106,35 @@ int mat3_inv(const float *mat, float *output) {
     return 0;
 }
 
+/** @brief Computes the point-to-anchors distance errors for a given reference
+  * point pos and measured distances meas, and writes the anchor-respective\
+  * errors to err.
+  *
+  * @param pos 2-sized array representing the reference point
+  * @param meas 4-sized array of the measured target-anchor distances
+  * @param err 4-sized buffer that will contain the array of distance errors
+  */
+void dist_err(const float* pos, const uint16_t* meas, float* err) {
+    err[0] = (pos[0] - anchor_pos[0][0])*(pos[0] - anchor_pos[0][0])
+         + (pos[1] - anchor_pos[0][1])*(pos[1] - anchor_pos[0][1]);
+    err[0] = sqrtf(err[0]);
+    err[0] -= meas[0];
+
+    err[1] = (pos[0] - anchor_pos[1][0])*(pos[0] - anchor_pos[1][0])
+         + (pos[1] - anchor_pos[1][1])*(pos[1] - anchor_pos[1][1]);
+    err[1] = sqrtf(err[1]);
+    err[1] -= meas[1];
+
+    err[2] = (pos[0] - anchor_pos[2][0])*(pos[0] - anchor_pos[2][0])
+         + (pos[1] - anchor_pos[2][1])*(pos[1] - anchor_pos[2][1]);
+    err[2] = sqrtf(err[2]);
+    err[2] -= meas[2];
+
+    err[3] = (pos[0] - anchor_pos[3][0])*(pos[0] - anchor_pos[3][0])
+         + (pos[1] - anchor_pos[3][1])*(pos[1] - anchor_pos[3][1]);
+    err[3] = sqrtf(err[3]);
+    err[3] -= meas[3];
+}
 
 /********** LIBRARY FUNCTIONS **********/
 
@@ -119,10 +148,10 @@ int position_trilateration(const uint16_t *dist, float *pos) {
         return -1;
 
     static const float edges_inv[] = {
-        (anchor_pos[0][1] - anchor_pos[2][1]) / edges_det,
-        -(anchor_pos[0][1] - anchor_pos[1][1]) / edges_det,
-        -(anchor_pos[0][0] - anchor_pos[2][0]) / edges_det,
-        (anchor_pos[0][0] - anchor_pos[1][0]) / edges_det
+        (anchor_pos[2][1] - anchor_pos[0][1]) / edges_det,
+        -(anchor_pos[1][1] - anchor_pos[0][1]) / edges_det,
+        -(anchor_pos[2][0] - anchor_pos[0][0]) / edges_det,
+        (anchor_pos[1][0] - anchor_pos[0][0]) / edges_det
     };
 
     // Compute the vector of coefficients y
@@ -143,19 +172,19 @@ int position_trilateration(const uint16_t *dist, float *pos) {
 
 int position_ols(const uint16_t *dist, float *pos) {
     static const float edges[] = {
-        anchor_pos[0][0] - anchor_pos[1][0],
-        anchor_pos[0][1] - anchor_pos[1][1],
-        anchor_pos[0][0] - anchor_pos[2][0],
-        anchor_pos[0][1] - anchor_pos[2][1],
-        anchor_pos[0][0] - anchor_pos[3][0],
-        anchor_pos[0][1] - anchor_pos[3][1],
+        anchor_pos[1][0] - anchor_pos[0][0],
+        anchor_pos[1][1] - anchor_pos[0][1],
+        anchor_pos[2][0] - anchor_pos[0][0],
+        anchor_pos[2][1] - anchor_pos[0][1],
+        anchor_pos[3][0] - anchor_pos[0][0],
+        anchor_pos[3][1] - anchor_pos[0][1],
     }, edges_transpose[] = {
-        anchor_pos[0][0] - anchor_pos[1][0],
-        anchor_pos[0][0] - anchor_pos[2][0],
-        anchor_pos[0][0] - anchor_pos[3][0],
-        anchor_pos[0][1] - anchor_pos[1][1],
-        anchor_pos[0][1] - anchor_pos[2][1],
-        anchor_pos[0][1] - anchor_pos[3][1],
+        anchor_pos[1][0] - anchor_pos[0][0],
+        anchor_pos[2][0] - anchor_pos[0][0],
+        anchor_pos[3][0] - anchor_pos[0][0],
+        anchor_pos[1][1] - anchor_pos[0][1],
+        anchor_pos[2][1] - anchor_pos[0][1],
+        anchor_pos[3][1] - anchor_pos[0][1],
     };
 
     // Compute the necessary matrices
@@ -186,33 +215,25 @@ int position_ols(const uint16_t *dist, float *pos) {
     return 0;
 }
 
-int position_fgls(const uint16_t *dist, float *pos) {
+int position_fgls(const uint16_t *dist, const float sigma_sq, float *pos,) {
     static const float edges[] = {
-        anchor_pos[0][0] - anchor_pos[1][0],
-        anchor_pos[0][1] - anchor_pos[1][1],
-        anchor_pos[0][0] - anchor_pos[2][0],
-        anchor_pos[0][1] - anchor_pos[2][1],
-        anchor_pos[0][0] - anchor_pos[3][0],
-        anchor_pos[0][1] - anchor_pos[3][1],
+        anchor_pos[1][0] - anchor_pos[0][0],
+        anchor_pos[1][1] - anchor_pos[0][1],
+        anchor_pos[2][0] - anchor_pos[0][0],
+        anchor_pos[2][1] - anchor_pos[0][1],
+        anchor_pos[3][0] - anchor_pos[0][0],
+        anchor_pos[3][1] - anchor_pos[0][1],
     }, edges_transpose[] = {
-        anchor_pos[0][0] - anchor_pos[1][0],
-        anchor_pos[0][0] - anchor_pos[2][0],
-        anchor_pos[0][0] - anchor_pos[3][0],
-        anchor_pos[0][1] - anchor_pos[1][1],
-        anchor_pos[0][1] - anchor_pos[2][1],
-        anchor_pos[0][1] - anchor_pos[3][1],
+        anchor_pos[1][0] - anchor_pos[0][0],
+        anchor_pos[2][0] - anchor_pos[0][0],
+        anchor_pos[3][0] - anchor_pos[0][0],
+        anchor_pos[1][1] - anchor_pos[0][1],
+        anchor_pos[2][1] - anchor_pos[0][1],
+        anchor_pos[3][1] - anchor_pos[0][1],
     };
 
     if (position_ols(dist, pos) == -1)
         return -1;
-
-    // Compute hat{s}**2
-    float sigma_sq = 0;
-    for (int i = 0; i < 3; i++)
-        sigma_sq += dist[i] - sqrtf(
-            (pos[0] - anchor_pos[i][0])*(pos[0] - anchor_pos[i][0])
-            + (pos[1] - anchor_pos[i][1])*(pos[1] - anchor_pos[i][1]));
-    sigma_sq /= 4;
 
     // Estimate P^{-1}
     const float cov[] = {
@@ -234,11 +255,11 @@ int position_fgls(const uint16_t *dist, float *pos) {
     // Compute E^T P^{-1}, (E^T P^{-1} E)^{-1},
     // and the final matrix (E^T P^{-1} E)^{-1} E^T P^{-1}
     float edges_transpose_cov[2*3], weighted_edges_prod[2*2], weighted_edges_prod_inv[2*2], full_matrix[2*3];
-    matmat_mult(edges_transpose, 2, 3, cov, 3, edges_transpose_cov);
+    matmat_mult(edges_transpose, 2, 3, cov_inv, 3, edges_transpose_cov);
     matmat_mult(edges_transpose_cov, 2, 3, edges, 2, weighted_edges_prod);
     if (mat2_inv(weighted_edges_prod, weighted_edges_prod_inv) == -1)
             return -1;
-    matmat_mult(weighted_edges_prod_inv, 2, 2, edges_transpose_cov, 2, full_matrix);
+    matmat_mult(weighted_edges_prod_inv, 2, 2, edges_transpose_cov, 3, full_matrix);
 
     // Compute the vectors of coefficients
     static const float norms_sq[] = {
@@ -256,28 +277,6 @@ int position_fgls(const uint16_t *dist, float *pos) {
     // Estimate the target as (E^T P E)^{-1} E^T P y
     matvec_mult(full_matrix, 2, 3, coeffs, pos);
     return 0;
-}
-
-void dist_err(const float* pos, const uint16_t* measured, float* err) {
-    err[0] = (pos[0] - anchor_pos[0][0])*(pos[0] - anchor_pos[0][0])
-         + (pos[1] - anchor_pos[0][1])*(pos[1] - anchor_pos[0][1]);
-    err[0] = sqrtf(err[0]);
-    err[0] -= measured[0];
-
-    err[1] = (pos[0] - anchor_pos[1][0])*(pos[0] - anchor_pos[1][0])
-         + (pos[1] - anchor_pos[1][1])*(pos[1] - anchor_pos[1][1]);
-    err[1] = sqrtf(err[1]);
-    err[1] -= measured[1];
-
-    err[2] = (pos[0] - anchor_pos[2][0])*(pos[0] - anchor_pos[2][0])
-         + (pos[1] - anchor_pos[2][1])*(pos[1] - anchor_pos[2][1]);
-    err[2] = sqrtf(err[2]);
-    err[2] -= measured[2];
-
-    err[3] = (pos[0] - anchor_pos[3][0])*(pos[0] - anchor_pos[3][0])
-         + (pos[1] - anchor_pos[3][1])*(pos[1] - anchor_pos[3][1]);
-    err[3] = sqrtf(err[3]);
-    err[3] -= measured[3];
 }
 
 int position_mle(const uint16_t* dist, float* pos) {
