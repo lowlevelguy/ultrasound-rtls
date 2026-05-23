@@ -1,11 +1,16 @@
-#include "position.h"
 #include <string.h>
 #include <math.h>
+#include "position.h"
+#include "config.h"
+
+#ifndef CONFIG_ANCHOR_POS
+#error "Please define anchor_pos in config.h"
+#endif
 
 #define EPS_DET 1e-6f
-#define EPS_GN  1e-6f
-#define STEP_GN 1e-4f
-#define MAX_ITERATIONS_GN 5
+#define STEP_GN 1e-2f
+#define MAX_ITERATIONS_GN 4
+
 
 /********** HELPER FUNCTIONS **********/
 
@@ -215,7 +220,7 @@ int position_ols(const uint16_t *dist, float *pos) {
     return 0;
 }
 
-int position_fgls(const uint16_t *dist, const float sigma_sq, float *pos,) {
+int position_fgls(const uint16_t *dist, const float sigma_sq, float *pos) {
     static const float edges[] = {
         anchor_pos[1][0] - anchor_pos[0][0],
         anchor_pos[1][1] - anchor_pos[0][1],
@@ -287,8 +292,7 @@ int position_mle(const uint16_t* dist, float* pos) {
         norm_sq;
 
     dist_err(point, dist, val);
-    norm_sq = val[0]*val[0] + val[1]*val[1] + val[2]*val[2] + val[3]*val[3];
-    for (int i = 0; i < MAX_ITERATIONS_GN && norm_sq >= EPS_GN; i++) {
+    for (int i = 0; i < MAX_ITERATIONS_GN; i++) {
         // Compute Jacobian and its transpose
         point_shift[0] = point[0] + STEP_GN;
         point_shift[1] = point[1];
@@ -328,7 +332,6 @@ int position_mle(const uint16_t* dist, float* pos) {
         point[1] -= val_tf[1];
 
         dist_err(point, dist, val);
-        norm_sq = val[0]*val[0] + val[1]*val[1] + val[2]*val[2] + val[3]*val[3];
     }
 
     pos[0] = point[0];

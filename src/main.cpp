@@ -1,15 +1,9 @@
 #include <Arduino.h>
 
 #include "position.h"
+#include "config.h"
 
-const float anchor_pos[4][2] = {
-    {0, 0},
-    {400, 0},
-    {0, 400},
-    {400, 400}
-};
-
-float max_pos_err, min_pos_err, mean_pos_err, variance_pos_err;
+float max_count, min_count, mean, variance;
 
 float rand_stdnormal();
 
@@ -18,59 +12,69 @@ void setup() {
 
     // Generate inputs
     const float sigma = 5;
-    float true_pos[2], pos[2], pos_err[500];
-    uint16_t dists[4];
-    for (int i = 0; i < 500; i++) {
-        true_pos[0] = (float)rand() / (float)RAND_MAX * 400;
-        true_pos[1] = (float)rand() / (float)RAND_MAX * 400;
+    float true_pos[2], pos[301][2],
+        //pos_err[500];
+        cycle_counts[301];
+    uint32_t start_cycle;
+    uint16_t dists[301][4];
+    for (int i = 0; i < 301; i++) {
+        true_pos[0] = (float)rand() / (float)RAND_MAX * 4000;
+        true_pos[1] = (float)rand() / (float)RAND_MAX * 4000;
 
-        dists[0] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[0][0]) * (true_pos[0] - anchor_pos[0][0])
+        dists[i][0] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[0][0]) * (true_pos[0] - anchor_pos[0][0])
                  + (true_pos[1] - anchor_pos[0][1]) * (true_pos[1] - anchor_pos[0][1]));
-//        dists[0] += (uint16_t)(sigma * rand_stdnormal());
+        dists[i][0] += (uint16_t)(sigma * rand_stdnormal());
 
-        dists[1] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[1][0]) * (true_pos[0] - anchor_pos[1][0])
+        dists[i][1] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[1][0]) * (true_pos[0] - anchor_pos[1][0])
                  + (true_pos[1] - anchor_pos[1][1]) * (true_pos[1] - anchor_pos[1][1]));
-//        dists[1] += (uint16_t)(sigma * rand_stdnormal());
+        dists[i][1] += (uint16_t)(sigma * rand_stdnormal());
 
-        dists[2] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[2][0]) * (true_pos[0] - anchor_pos[2][0])
+        dists[i][2] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[2][0]) * (true_pos[0] - anchor_pos[2][0])
                  + (true_pos[1] - anchor_pos[2][1]) * (true_pos[1] - anchor_pos[2][1]));
-//        dists[2] += (uint16_t)(sigma * rand_stdnormal());
+        dists[i][2] += (uint16_t)(sigma * rand_stdnormal());
 
-        dists[3] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[3][0]) * (true_pos[0] - anchor_pos[3][0])
+        dists[i][3] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[3][0]) * (true_pos[0] - anchor_pos[3][0])
                  + (true_pos[1] - anchor_pos[3][1]) * (true_pos[1] - anchor_pos[3][1]));
-//        dists[3] += (uint16_t)(sigma * rand_stdnormal());
+        dists[i][3] += (uint16_t)(sigma * rand_stdnormal());
 
-        position_fgls(dists, pos);
-        pos_err[i] = sqrtf((pos[0] - true_pos[0]) * (pos[0] - true_pos[0])
-                        + (pos[1] - true_pos[1]) * (pos[1] - true_pos[1]));
+//        position_fgls(dists, sigma*sigma, pos);
+//        position_mle(dists, pos)
+    }
+
+    for (int i = 0; i < 301; i++) {
+        portDISABLE_INTERRUPTS();
+        start_cycle = esp_cpu_get_ccount();
+        position_mle(dists[i], pos[i]);
+        cycle_counts[i] = (float)(esp_cpu_get_ccount() - start_cycle);
+        portENABLE_INTERRUPTS();
     }
 
     // Stats for position estimation accuracy
-    max_pos_err = pos_err[0];
-    min_pos_err = pos_err[0];
-    mean_pos_err = pos_err[0];
-    for (int i = 1; i < 500; i++) {
-        if (pos_err[i] > max_pos_err)
-            max_pos_err = pos_err[i];
-        if (pos_err[i] < min_pos_err)
-            min_pos_err = pos_err[i];
-        mean_pos_err += pos_err[i];
+    max_count = cycle_counts[1];
+    min_count = cycle_counts[1];
+    mean = cycle_counts[1];
+    for (int i = 2; i < 301; i++) {
+        if (cycle_counts[i] > max_count)
+            max_count = cycle_counts[i];
+        if (cycle_counts[i] < min_count)
+            min_count = cycle_counts[i];
+        mean += cycle_counts[i];
     }
-    mean_pos_err /= 500;
+    mean /= 300;
 
-    variance_pos_err = 0;
-    for (int i = 0; i < 500; i++) {
-        variance_pos_err += (pos_err[i] - mean_pos_err) * (pos_err[i] - mean_pos_err);
+    variance = 0;
+    for (int i = 1; i < 301; i++) {
+        variance += (cycle_counts[i] - mean) * (cycle_counts[i] - mean);
     }
-    variance_pos_err /= 500;
+    variance /= 300;
 }
 
 void loop() {
     delay(1000);
-    Serial.printf("Min position error:      %.2f mm\n", min_pos_err);
-    Serial.printf("Max position error:      %.2f mm\n", max_pos_err);
-    Serial.printf("Mean position error:     %.2f mm\n", mean_pos_err);
-    Serial.printf("Std dev position error:  %.2f mm\n", sqrtf(variance_pos_err));
+    Serial.printf("Min cycle count:      %.2f mm\n", min_count);
+    Serial.printf("Max cycle count:      %.2f mm\n", max_count);
+    Serial.printf("Mean cycle count:     %.2f mm\n", mean);
+    Serial.printf("Std dev cycle count:  %.2f mm\n", sqrtf(variance));
 }
 
 float rand_stdnormal() {

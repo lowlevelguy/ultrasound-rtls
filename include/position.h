@@ -2,8 +2,6 @@
 
 #include <stdint.h>
 
-extern const float anchor_pos[4][2];
-
 /** @brief Performs trilateration to estimate the position of the target.
   *
   * @details
@@ -103,8 +101,6 @@ int position_ols(const uint16_t* dist, float* pos);
   * that the condition of three of the anchors being non-collinear is unfulfilled.
   */
 int position_fgls(const uint16_t* dist, const float sigma_sq, float* pos);
-
-int position_irls(const uint16_t* dist, float* pos);
 
 /** @brief Numerically estimates the Maximum Likelihood Estimator for the
   * target's position, assuming homoscedasticity.
