@@ -145,14 +145,14 @@ void dist_err(const float* pos, const uint16_t* meas, float* err) {
 
 int position_trilateration(const uint16_t *dist, float *pos) {
     // Use the matrix of cofactors to compute the inverse of the edges matrix E
-    static const float edges_det =
+    static constexpr float edges_det =
             (anchor_pos[0][0] - anchor_pos[1][0]) * (anchor_pos[0][1] - anchor_pos[2][1])
             - (anchor_pos[0][0] - anchor_pos[2][0]) * (anchor_pos[0][1] - anchor_pos[1][1]);
 
     if (edges_det < EPS_DET && edges_det > -EPS_DET)
         return -1;
 
-    static const float edges_inv[] = {
+    static constexpr float edges_inv[] = {
         (anchor_pos[2][1] - anchor_pos[0][1]) / edges_det,
         -(anchor_pos[1][1] - anchor_pos[0][1]) / edges_det,
         -(anchor_pos[2][0] - anchor_pos[0][0]) / edges_det,
@@ -160,7 +160,7 @@ int position_trilateration(const uint16_t *dist, float *pos) {
     };
 
     // Compute the vector of coefficients y
-    static const float norms_sq[] = {
+    static constexpr float norms_sq[] = {
         anchor_pos[0][0] * anchor_pos[0][0] + anchor_pos[0][1] * anchor_pos[0][1],
         anchor_pos[1][0] * anchor_pos[1][0] + anchor_pos[1][1] * anchor_pos[1][1],
         anchor_pos[2][0] * anchor_pos[2][0] + anchor_pos[2][1] * anchor_pos[2][1]
@@ -176,7 +176,7 @@ int position_trilateration(const uint16_t *dist, float *pos) {
 }
 
 int position_ols(const uint16_t *dist, float *pos) {
-    static const float edges[] = {
+    static constexpr float edges[] = {
         anchor_pos[1][0] - anchor_pos[0][0],
         anchor_pos[1][1] - anchor_pos[0][1],
         anchor_pos[2][0] - anchor_pos[0][0],
@@ -203,7 +203,7 @@ int position_ols(const uint16_t *dist, float *pos) {
 
 
     // Compute the vectors of coefficients
-    static const float norms_sq[] = {
+    static constexpr float norms_sq[] = {
         anchor_pos[0][0] * anchor_pos[0][0] + anchor_pos[0][1] * anchor_pos[0][1],
         anchor_pos[1][0] * anchor_pos[1][0] + anchor_pos[1][1] * anchor_pos[1][1],
         anchor_pos[2][0] * anchor_pos[2][0] + anchor_pos[2][1] * anchor_pos[2][1],
@@ -221,7 +221,7 @@ int position_ols(const uint16_t *dist, float *pos) {
 }
 
 int position_fgls(const uint16_t *dist, const float sigma_sq, float *pos) {
-    static const float edges[] = {
+    static constexpr float edges[] = {
         anchor_pos[1][0] - anchor_pos[0][0],
         anchor_pos[1][1] - anchor_pos[0][1],
         anchor_pos[2][0] - anchor_pos[0][0],
@@ -267,7 +267,7 @@ int position_fgls(const uint16_t *dist, const float sigma_sq, float *pos) {
     matmat_mult(weighted_edges_prod_inv, 2, 2, edges_transpose_cov, 3, full_matrix);
 
     // Compute the vectors of coefficients
-    static const float norms_sq[] = {
+    static constexpr float norms_sq[] = {
         anchor_pos[0][0] * anchor_pos[0][0] + anchor_pos[0][1] * anchor_pos[0][1],
         anchor_pos[1][0] * anchor_pos[1][0] + anchor_pos[1][1] * anchor_pos[1][1],
         anchor_pos[2][0] * anchor_pos[2][0] + anchor_pos[2][1] * anchor_pos[2][1],
