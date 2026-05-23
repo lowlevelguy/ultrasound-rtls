@@ -47,36 +47,38 @@ int init_sensor(int sensor_index, const SerialHandle_t* handle, int baud_rate, i
     return 0;
 }
 
-//triggers the sensor and reads the distance
-int32_t read_sensor(int sensor_index) {
-    if (sensor_index < 0 || sensor_index >= 4)
-        return -1;
+//triggers the sensor and reads the distance in mm, returns -1 on failure, the return result is in params->result
+void read_sensor(void* read_params) {
+    read_params_t* params = (read_params_t*)read_params;
+    
+    if (params->sensor_index < 0 || params->sensor_index >= 4)
+        params->result = -1;
 
     // flush stale data before triggering
-    while (sensor_available(SENSORS[sensor_index]))
-        sensor_read(SENSORS[sensor_index]);
+    while (sensor_available(SENSORS[params->sensor_index]))
+        sensor_read(SENSORS[params->sensor_index]);
 
-    sensor_write(SENSORS[sensor_index], SENSOR_TRIGGER_BYTE);
+    sensor_write(SENSORS[params->sensor_index], SENSOR_TRIGGER_BYTE);
 
     // wait for 4 bytes: 0xFF + H_byte + L_byte + checksum
     unsigned long start = millis();
-    while (sensor_available(SENSORS[sensor_index]) < 4) {
+    while (sensor_available(SENSORS[params->sensor_index]) < 4) {
         if ((millis() - start) > MAX_WAIT_TIME_MS)
-            return -1;
+            params->result = 1;
         vTaskDelay(1); // yield to FreeRTOS scheduler while waiting
     }
 
     uint8_t buffer[4];
-    sensor_read_bytes(SENSORS[sensor_index], buffer, 4);
+    sensor_read_bytes(SENSORS[params->sensor_index], buffer, 4);
 
     if (buffer[0] != 0xFF)
-        return -1;
+        params->result = -1;
 
     uint8_t high_byte = buffer[1], low_byte  = buffer[2],
         checksum  = (uint8_t)(((uint16_t)high_byte + low_byte) & 0xFF);
 
     if (checksum != buffer[3])
-        return -1;
+        params->result = -1;
 
-    return (high_byte << 8) | low_byte;
+    params->result= (high_byte << 8) | low_byte;
 }
