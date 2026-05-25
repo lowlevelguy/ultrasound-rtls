@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
-#include "position.h"
-#include "config.h"
+#include "teensy/position.h"
+#include "teensy/config.h"
 
 float max_count, min_count, mean, variance;
 

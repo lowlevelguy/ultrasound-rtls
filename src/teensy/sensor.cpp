@@ -1,6 +1,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include "sensor.h"
+#include "teensy/sensor.h"
 
 #define MAX_WAIT_TIME_MS 100
 #define SENSOR_TRIGGER_BYTE 0x01

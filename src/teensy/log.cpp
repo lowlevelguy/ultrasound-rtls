@@ -1,4 +1,4 @@
-#include "log.h"
+#include "teensy/log.h"
 #include <LittleFS.h>
 
 static log_queue_entry_t log_queue[QUEUE_SIZE];

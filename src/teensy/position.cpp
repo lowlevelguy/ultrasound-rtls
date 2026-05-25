@@ -1,7 +1,7 @@
 #include <string.h>
 #include <math.h>
-#include "position.h"
-#include "config.h"
+#include "teensy/position.h"
+#include "teensy/config.h"
 
 #ifndef CONFIG_ANCHOR_POS
 #error "Please define anchor_pos in config.h"
@@ -288,8 +288,7 @@ int position_mle(const uint16_t* dist, float* pos) {
     // Perform Gauss-Newton to find the point with minimal squared error
     float point[2] = {0}, point_shift[2],
         val[4], val_shift[4], val_tf[4],
-        J[4*2], Jt[2*4], JtJ[2*2], JtJ_inv[2*2], full_matrix[2*4],
-        norm_sq;
+        J[4*2], Jt[2*4], JtJ[2*2], JtJ_inv[2*2], full_matrix[2*4];
 
     dist_err(point, dist, val);
     for (int i = 0; i < MAX_ITERATIONS_GN; i++) {
