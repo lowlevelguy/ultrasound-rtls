@@ -1,7 +1,7 @@
 #include <string.h>
 #include <math.h>
 #include "teensy/position.h"
-#include "teensy/config.h"
+#include "config.h"
 
 #ifndef CONFIG_ANCHOR_POS
 #error "Please define anchor_pos in config.h"

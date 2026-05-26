@@ -1,4 +1,9 @@
 #include "teensy/sensor.h"
+#include "config.h"
+
+#ifndef CONFIG_SENSORS
+#error "Please define log_serial in config.h"
+#endif
 
 #define MAX_WAIT_TIME_MS 100
 #define SENSOR_TRIGGER_BYTE 0x01
@@ -29,25 +34,20 @@ static void sensor_read_bytes(SerialHandle_t s, uint8_t* buffer, size_t len) {
         s.sw->readBytes(buffer, len);
 }
 
-int init_sensor(int sensor_index, const SerialHandle_t* handle, int baud_rate, int RX, int TX) {
+int sensor_begin(int sensor_index, int baud_rate) {
     if (sensor_index < 0 || sensor_index >= 4)
         return -1;
-    if (handle == NULL)
-        return -1;
 
-    memcpy(&SENSORS[sensor_index], handle, sizeof(SerialHandle_t));
-
-    if (handle->type == SerialHandle_t::HW)
-        handle->hw->begin(baud_rate, SERIAL_8N1, RX, TX);
+    if (SENSORS[sensor_index].type == SerialHandle_t::HW)
+        SENSORS[sensor_index].hw->begin(baud_rate);
     else
-        handle->sw->begin(baud_rate); // RX/TX already set in constructor in main
+        SENSORS[sensor_index].sw->begin(baud_rate);
 
     return 0;
 }
 
 //triggers the sensor and reads the distance in mm, returns -1 on failure, the return result is in result
 int32_t read_sensor(int sensor_index) {
-    
     if (sensor_index < 0 || sensor_index >= 4)
         return -1;
 
@@ -77,6 +77,6 @@ int32_t read_sensor(int sensor_index) {
         return -1;
 
     float result = (float)((high_byte << 8) | low_byte);
-    result = (result + 21.5) / 0.9896; // correcting the measurement error using linear interpolation
+    result = (result + 21.5f) / 0.9896f; // correcting the measurement error using linear interpolation
     return (int32_t)result;
 }

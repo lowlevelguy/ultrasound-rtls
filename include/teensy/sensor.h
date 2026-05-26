@@ -12,7 +12,5 @@ typedef struct SerialHandle {
     };
 } SerialHandle_t;
 
-extern SerialHandle_t SENSORS[4];
-
-int init_sensor(int sensor_index, SerialHandle_t* handle, int baud_rate, int RX, int TX);
+int sensor_begin(int sensor_index, int baud_rate);
 int32_t read_sensor(int sensor_index);
