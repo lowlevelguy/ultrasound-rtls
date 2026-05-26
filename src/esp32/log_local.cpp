@@ -27,7 +27,7 @@ int save_to_file(fs::FS *fs, uint32_t buffer_index) {
         return -1;
     }
 
-    for(int i = 0; i < queue_index; ++i) {
+    for(int i = 0; i < QUEUE_SIZE; ++i) {
         if(!file.printf("%lu,%.2f,%.2f\n",
             log_queue[buffer_index][i].timestamp, 
             log_queue[buffer_index][i].x, 
@@ -38,7 +38,6 @@ int save_to_file(fs::FS *fs, uint32_t buffer_index) {
         }
     }
     file.close();
-    queue_index = 0;
     return 0;
 }
 
@@ -52,6 +51,7 @@ int on_read(const float* pos, const unsigned long timestamp) {
     if(queue_index >= QUEUE_SIZE) {
         buffer_index = 1 - buffer_index;
         xTaskNotify(logger_handle, 1-buffer_index, eSetValueWithOverwrite);
+        queue_index = 0;
         return 1;
     }
 
