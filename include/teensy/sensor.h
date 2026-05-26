@@ -4,11 +4,6 @@
 #include <SoftwareSerial.h>
 #include <HardwareSerial.h>
 
-typedef struct readParams {
-    int sensor_index;
-    int32_t result;
-} read_params_t;
-
 typedef struct SerialHandle {
     enum { HW, SW } type;
     union {

@@ -1,5 +1,3 @@
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #include "teensy/sensor.h"
 
 #define MAX_WAIT_TIME_MS 100
@@ -47,38 +45,38 @@ int init_sensor(int sensor_index, const SerialHandle_t* handle, int baud_rate, i
     return 0;
 }
 
-//triggers the sensor and reads the distance in mm, returns -1 on failure, the return result is in params->result
-void read_sensor(void* read_params) {
-    read_params_t* params = (read_params_t*)read_params;
+//triggers the sensor and reads the distance in mm, returns -1 on failure, the return result is in result
+int32_t read_sensor(int sensor_index) {
     
-    if (params->sensor_index < 0 || params->sensor_index >= 4)
-        params->result = -1;
+    if (sensor_index < 0 || sensor_index >= 4)
+        return -1;
 
     // flush stale data before triggering
-    while (sensor_available(SENSORS[params->sensor_index]))
-        sensor_read(SENSORS[params->sensor_index]);
+    while (sensor_available(SENSORS[sensor_index]))
+        sensor_read(SENSORS[sensor_index]);
 
-    sensor_write(SENSORS[params->sensor_index], SENSOR_TRIGGER_BYTE);
+    sensor_write(SENSORS[sensor_index], SENSOR_TRIGGER_BYTE);
 
     // wait for 4 bytes: 0xFF + H_byte + L_byte + checksum
     unsigned long start = millis();
-    while (sensor_available(SENSORS[params->sensor_index]) < 4) {
+    while (sensor_available(SENSORS[sensor_index]) < 4) {
         if ((millis() - start) > MAX_WAIT_TIME_MS)
-            params->result = 1;
-        vTaskDelay(1); // yield to FreeRTOS scheduler while waiting
+            return -1;
     }
 
     uint8_t buffer[4];
-    sensor_read_bytes(SENSORS[params->sensor_index], buffer, 4);
+    sensor_read_bytes(SENSORS[sensor_index], buffer, 4);
 
     if (buffer[0] != 0xFF)
-        params->result = -1;
+        return -1;
 
     uint8_t high_byte = buffer[1], low_byte  = buffer[2],
         checksum  = (uint8_t)(((uint16_t)high_byte + low_byte) & 0xFF);
 
     if (checksum != buffer[3])
-        params->result = -1;
+        return -1;
 
-    params->result= (high_byte << 8) | low_byte;
+    float result = (float)((high_byte << 8) | low_byte);
+    result = (result + 21.5) / 0.9896; // correcting the measurement error using linear interpolation
+    return (int32_t)result;
 }
