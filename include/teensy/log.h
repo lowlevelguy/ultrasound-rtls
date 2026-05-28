@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#define START_BYTE 0xAA
 
 typedef struct {
     uint8_t start;
@@ -13,4 +14,4 @@ typedef struct {
     uint32_t timestamp;
 } __attribute__((packed)) ack_packet_t;
 
-int log_reading(uint32_t timestamp, float pos[2]);
+int log_timepos(uint32_t timestamp, float pos[2]);

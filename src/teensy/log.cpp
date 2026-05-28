@@ -5,7 +5,6 @@
 #error "Please define tlog_serial in config.h"
 #endif
 
-#define START_BYTE 0xAA
 #define WRITE_TIMEOUT_MS 10
 #define ACK_TIMEOUT_MS 100
 
@@ -17,7 +16,7 @@ uint8_t checksum8(uint8_t* buf, uint8_t buf_sz) {
     return cs;
 }
 
-int log_reading(uint32_t timestamp, float pos[2]) {
+int log_timepos(uint32_t timestamp, float pos[2]) {
     log_packet_t log_packet;
     ack_packet_t ack_packet;
     log_packet.start = START_BYTE;

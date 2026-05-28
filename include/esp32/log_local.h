@@ -5,6 +5,8 @@
 
 #define LOG_FILE_PATH "/log.csv"
 #define QUEUE_SIZE 10
+#define START_BYTE 0xAA
+
 TaskHandle_t logger_handle = NULL;
 
 typedef struct logQueueEntry {
@@ -13,6 +15,18 @@ typedef struct logQueueEntry {
     unsigned long timestamp;
 } log_queue_entry_t;
 
+typedef struct {
+    uint8_t start;
+    uint32_t timestamp;
+    float pos[2];
+    uint8_t checksum;
+} __attribute__((packed)) log_packet_t;
+
+typedef struct {
+    uint8_t start;
+    uint32_t timestamp;
+} __attribute__((packed)) ack_packet_t;
+
 int initialize_log_file(fs::FS *fs);
-int on_read(const float* pos, const unsigned long timestamp);
+void on_read(const float* pos, const uint32_t timestamp);
 int save_to_file(fs::FS *fs, uint32_t buffer_index);
