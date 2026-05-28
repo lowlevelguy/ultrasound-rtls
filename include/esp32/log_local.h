@@ -1,13 +1,15 @@
 #pragma once
 #include "FS.h"
 #include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <freertos/task.h>
 
 #define LOG_FILE_PATH "/log.csv"
 #define QUEUE_SIZE 10
 #define START_BYTE 0xAA
 
-TaskHandle_t logger_handle = NULL;
+extern SemaphoreHandle_t buffer_mutex;
+extern TaskHandle_t logger_handle;
 
 typedef struct logQueueEntry {
     float x;
@@ -28,5 +30,5 @@ typedef struct {
 } __attribute__((packed)) ack_packet_t;
 
 int initialize_log_file(fs::FS *fs);
-void on_read(const float* pos, const uint32_t timestamp);
-int save_to_file(fs::FS *fs, uint32_t buffer_index);
+void uart_recieve(void* param);
+void logger_task(void* file_s);
