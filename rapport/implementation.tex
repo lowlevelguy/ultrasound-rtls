@@ -1,2 +1,218 @@
 \section{Implementation}
-Talk about our implementation hardware, software, architecture, etc. here...
+
+This section presents the complete hardware and software implementation of the ultrasound-based real-time localization system. The system employs a distributed dual-microcontroller architecture that decouples real-time position computation from data acquisition and logging. The architecture is optimized to minimize latency in positioning calculations while ensuring robust data persistence and future extensibility for cloud-based analytics.
+
+\subsection{System Architecture}
+
+Our implementation follows a two-tier architecture that functionally decouples the real-time positioning subsystem from data logging and external communication. This separation of concerns enables independent optimization of each subsystem and facilitates future extensions such as cloud connectivity, web services integration, and multi-client position distribution.
+
+\subsubsection{Teensy 4.0 Real-Time Positioning Engine}
+
+The Teensy 4.0 microcontroller forms the core of our real-time positioning subsystem. It is equipped with an ARM Cortex-M7 processor operating at 600 MHz with 1 MB of on-board SRAM, providing ample computational resources for real-time distance measurement acquisition and position estimation. The device is programmed to continuously poll four ultrasonic distance sensors via independent hardware UART channels (Serial1 through Serial4), acquire their measurements, apply empirically-derived calibration corrections, and compute position estimates using the FGLS algorithm described in Section \ref{sec:fgls}.
+
+The Teensy 4.0's hardware UART implementation provides low-latency, interrupt-driven serial communication, ensuring that position computation is not delayed by I/O operations. Additionally, the device includes a cycle counter (ARM DWT) that enables precise measurement of algorithm execution time, facilitating real-time constraint validation.
+
+\subsubsection{ESP32 Data Aggregation and Logging Subsystem}
+
+The ESP32 microcontroller serves as the data aggregation and persistent storage component of the system. It receives position estimates from the Teensy 4.0 tracker via a dedicated UART link and maintains a circular buffer of position measurements. A dedicated FreeRTOS task manages asynchronous writes to persistent flash storage, decoupling the real-time position reception from I/O latency. The ESP32's dual-core architecture permits concurrent execution of communication reception and storage operations, and its wireless capabilities (802.11b/g/n WiFi and Bluetooth) provide a natural foundation for future cloud connectivity extensions.
+
+\subsubsection{Inter-Device Communication Protocol}
+
+Communication between the Teensy 4.0 and ESP32 is established over a dedicated hardware UART link configured at 115200 baud. Position data is transmitted in fixed-size binary packets containing: (i) a start byte (0xAA) for frame synchronization, (ii) a 32-bit unsigned timestamp in milliseconds, (iii) two 32-bit IEEE 754 single-precision floating-point values representing the 2D position coordinates in millimeters, and (iv) an 8-bit checksum computed as the XOR of all preceding bytes. The ESP32 performs packet validation including start byte verification and checksum confirmation before committing position data to persistent storage, rejecting malformed packets and logging errors for diagnostic purposes.
+
+\subsection{Ultrasonic Distance Sensors}
+
+The positioning system employs four ultrasonic distance sensors operating as fixed-location anchors. We employ three units of the AJ-SR04M waterproof ultrasonic transducer and one unit of the SR04M-2 (JSN SR04T 2.0 compatible) device. The heterogeneous sensor configuration was adopted to maximize system robustness; however, both sensor types implement compatible communication protocols with minor parametric variations addressed through firmware configuration.
+
+\subsubsection{AJ-SR04M: Waterproof Ultrasonic Distance Transducer}
+
+The AJ-SR04M represents a specialized variant of ultrasonic distance sensors designed for operation in outdoor and high-moisture environments. Its technical specifications are:
+
+\begin{itemize}
+    \item \textbf{Operating Frequency:} 40 kHz (ultrasonic)  
+    \item \textbf{Measurement Range:} 20 cm to 400 cm (effective working range)
+    \item \textbf{Resolution:} 3 mm per least significant bit
+    \item \textbf{Distance Accuracy:} $\pm$10 mm over the operating range
+    \item \textbf{Beam Divergence (Measurement Angle):} Approximately 15$^\circ$ half-angle
+    \item \textbf{Serial Communication:} TTL UART at 9600 bits/second
+    \item \textbf{Response Protocol:} Four-byte binary frames (0xFF + MSB + LSB + checksum)
+    \item \textbf{Trigger Command:} 0x01 (one-byte command)
+    \item \textbf{Environmental Rating:} IP67 (immersion to 1 meter)
+\end{itemize}
+
+Communication with the AJ-SR04M follows a master-initiated request-response paradigm. The Teensy 4.0 issues a trigger byte (0x01) to initiate a measurement cycle; the sensor subsequently performs a time-of-flight (ToF) measurement by transmitting an ultrasonic pulse, timing the echo return, and encoding the transit time into a distance value. The distance measurement is returned as a 16-bit big-endian integer (range 0--65535 corresponding to 0--40 meters of equivalent distance). The four-byte response packet is structured as: start byte 0xFF, high byte of distance, low byte of distance, and a checksum computed as the arithmetic sum of the high and low bytes modulo 256.
+
+\subsubsection{SR04M-2: JSN SR04T 2.0 Compatible Waterproof Sensor}
+
+The SR04M-2 is functionally analogous to the JSN SR04T 2.0 and is employed as the fourth distance anchor to enable overdetermined least-squares position estimation. Its specifications closely parallel the AJ-SR04M with the following distinctions:
+
+\begin{itemize}
+    \item \textbf{Operating Frequency:} 40 kHz (ultrasonic)
+    \item \textbf{Measurement Range:} 20 cm to 400 cm
+    \item \textbf{Resolution:} 3 mm per least significant bit
+    \item \textbf{Distance Accuracy:} $\pm$10 mm
+    \item \textbf{Beam Divergence (Measurement Angle):} Approximately 15$^\circ$ half-angle
+    \item \textbf{Serial Communication:} TTL UART at 9600 bits/second
+    \item \textbf{Response Protocol:} Four-byte binary frames (0x55 + MSB + LSB + checksum)
+    \item \textbf{Trigger Command:} 0x55 (one-byte command, differs from AJ-SR04M)
+    \item \textbf{Environmental Rating:} IP67
+\end{itemize}
+
+The principal hardware difference is the trigger command byte (0x55 instead of 0x01). Additionally, the SR04M-2 implements a distinct checksum algorithm: the checksum byte is computed as the arithmetic sum of all three preceding bytes (start byte + MSB + LSB), rather than the sum of only the distance bytes. These variations, while minor, necessitate sensor-specific firmware configuration. Our implementation maintains a polymorphic sensor abstraction layer that accommodates both communication protocols transparently.
+
+\subsection{Hardware Configuration and Sensor Deployment}
+
+\subsubsection{Spatial Anchor Configuration}
+
+The four ultrasonic distance sensors are deployed at fixed locations forming the corners of an axis-aligned rectangular region. This geometric configuration was selected to provide good observability of the 2D positioning problem across the operational area. The anchor positions in millimeters are:
+
+\begin{align*}
+    \vec{a}_1 &= (0, 0) \quad \text{(origin)} \\
+    \vec{a}_2 &= (4000, 0) \quad \text{(east)} \\
+    \vec{a}_3 &= (0, 4000) \quad \text{(north)} \\
+    \vec{a}_4 &= (4000, 4000) \quad \text{(northeast)}
+\end{align*}
+
+This rectangular $4000 \times 4000$ mm (4 meter $\times$ 4 meter) deployment region is sufficiently large to accommodate typical indoor positioning scenarios while remaining within the effective range of the ultrasonic sensors. The four-anchor configuration provides overdetermined constraints, enabling robust least-squares estimation and error detection.
+
+\subsubsection{Microcontroller-to-Sensor Serial Interface}
+
+Each ultrasonic sensor is connected to the Teensy 4.0 via an independent hardware UART channel, ensuring non-blocking concurrent access to sensor data:
+
+\begin{itemize}
+    \item \textbf{Sensor 1 (AJ-SR04M):} Serial1 (I/O pins 0 and 1)  
+    \item \textbf{Sensor 2 (AJ-SR04M):} Serial2 (I/O pins 9 and 10)
+    \item \textbf{Sensor 3 (AJ-SR04M):} Serial3 (I/O pins 7 and 8)
+    \item \textbf{Sensor 4 (SR04M-2):} Serial4 (I/O pins 14 and 15)
+\end{itemize}
+
+All UART channels are configured at 9600 baud (per sensor specifications) with 8-bit data frames, 1 stop bit, and no parity. The Teensy's Serial5 channel (pins 33 and 34) is dedicated to inter-device communication with the ESP32 logger at 115200 baud, providing a higher data rate suitable for rapid position packet transmission and acknowledgment.
+
+\subsection{Software Architecture}
+
+The Teensy 4.0 firmware implements a modular, layered architecture comprising three principal subsystems: (i) sensor acquisition and validation, (ii) real-time position estimation, and (iii) inter-device communication. Each subsystem is designed for low latency, deterministic execution, and robust error handling.
+
+\subsubsection{Sensor Acquisition and Calibration Module}
+
+The sensor acquisition module provides a unified abstraction layer for reading distance measurements from heterogeneous ultrasonic sensors. Its responsibilities include:
+
+\begin{itemize}
+    \item \textbf{Trigger Generation:} Dispatching the sensor-specific trigger command (0x01 for AJ-SR04M, 0x55 for SR04M-2) to initiate a measurement cycle
+    \item \textbf{Response Reception:} Non-blocking receipt of four-byte response packets with configurable timeout (100 ms per specification)
+    \item \textbf{Packet Validation:} Verification that the start byte is correct (0xFF) and checksum computation matches expectations
+    \item \textbf{Calibration Correction:} Application of sensor-specific linear calibration functions to account for systematic biases and scale factors
+    \item \textbf{Error Reporting:} Propagation of sensor faults (timeouts, checksum errors, out-of-range values) to the main control loop
+\end{itemize}
+
+To account for manufacturing tolerances, temperature-dependent drift, and acoustic environmental factors, each sensor undergoes empirical calibration against a series of known ground-truth distances. Using least-squares linear regression on calibration measurements, we determine a linear correction model of the form $d_{\text{correct}} = (d_{\text{meas}} + b) / a$ for each sensor:
+
+\begin{align*}
+    d_{\text{corrected}}^{(1)} &= \frac{d_{\text{measured}}^{(1)} + 21.5}{0.9896} \quad \text{(AJ-SR04M, Anchor 1)} \\
+    d_{\text{corrected}}^{(2)} &= \frac{d_{\text{measured}}^{(2)} + 12.6}{0.9876} \quad \text{(AJ-SR04M, Anchor 2)} \\
+    d_{\text{corrected}}^{(3)} &= \frac{d_{\text{measured}}^{(3)} + 19.9}{0.9713} \quad \text{(AJ-SR04M, Anchor 3)} \\
+    d_{\text{corrected}}^{(4)} &= \frac{d_{\text{measured}}^{(4)} + 43.8}{1.07} \quad \text{(SR04M-2, Anchor 4)}
+\end{align*}
+
+The calibration parameters were determined from a comprehensive characterization study spanning the 500 mm to 4000 mm operational range, sampled at 500 mm intervals. Linear regression on the measurement data yields $R^2$ values exceeding 0.999, validating the linearity of the sensor response across the operating region. Post-calibration residuals exhibit standard deviations below 2\%, confirming the efficacy of the correction model.
+Algorithms} \label{sec:position_est}
+
+The firmware implements three algorithms for 2D position estimation from distance measurements, selected based on application requirements and computational constraints. All algorithms operate on the linearized range-difference equations derived in Section \ref{sec:math}.
+
+\paragraph{Trilateration.}
+The trilateration algorithm provides a closed-form solution to the positioning problem using exactly three non-collinear anchors. Given distances $d_1, d_2, d_3$ to anchors $\vec{a}_1, \vec{a}_2, \vec{a}_3$, the algorithm constructs a $2 \times 2$ edge matrix $E$ and solves the linear system $E\vec{x} = \vec{y}$ where $\vec{y}$ is the transformed distance vector. The algorithm computes the matrix inverse analytically and executes in $O(1)$ time with approximately 30 CPU cycles. Trilateration is highly efficient but demonstrates increased sensitivity to measurement noise because it utilizes minimal redundancy (zero degrees of freedom). The algorithm fails when anchors are collinear, detected by verifying that $|\det(E)| \geq \epsilon_{\text{det}}$ where $\epsilon_{\text{det}} = 10^{-6}$ in our implementation.
+
+\paragraph{Ordinary Least Squares (OLS).}
+The OLS algorithm extends the three-anchor trilateration method to accommodate four anchors. It solves the overdetermined system $E\vec{x} = \vec{y}$ in the least-squares sense by computing $\vec{x} = (E^T E)^{-1} E^T \vec{y}$. This formulation minimizes $\|E\vec{x} - \vec{y}\|_2^2$ under the assumption that measurement errors are identically distributed with equal variance. The OLS algorithm operates in approximately 270 CPU cycles. While OLS provides improved noise robustness compared to trilateration through data redundancy (one degree of freedom), it disregards the heteroscedastic nature of ultrasonic distance measurement errors, wherein measurements at larger distances exhibit higher variance.
+
+\paragraph{Feasible Generalized Least Squares (FGLS).} \label{sec:fgls}
+The FGLS algorithm is our primary positioning method and addresses the heteroscedastic error structure of ultrasonic measurements. Under the statistical model that observed distances are corrupted by additive Gaussian noise with magnitude-dependent variance, FGLS constructs a weighted least-squares estimate that assigns lower weight to high-variance measurements:
+
+$$\vec{x}_{\text{FGLS}} = \arg\min_{\vec{x}} \left( E\vec{x} - \vec{y} \right)^T P^{-1} \left( E\vec{x} - \vec{y} \right)$$
+
+where $P$ is thInter-Device Communication and Data Logging}
+
+The ESP32 microcontroller implements an asynchronous data logging subsystem that decouples real-time position reception from file I/O operations. Position packets received from the Teensy 4.0 are immediately enqueued into a ring buffer (capacity: 10 entries, $\approx 240$ bytes) protected by a FreeRTOS semaphore. A dedicated FreeRTOS task executing at lower priority services this buffer, dequeuing position entries and performing non-blocking writes to a persistent comma-separated values (CSV) file stored in the ESP32's internal flash memory.
+
+This producer-consumer pattern ensures that position packet reception is not delayed by flash I/O latency (typically 10--100 milliseconds per write). Should the ring buffer overflow (buffer full when a new position arrives), the oldest entry is discarded and an error counter is incremented; however, such events are rare given the positioning update frequency ($\approx 10$ Hz) and buffer capacity. Timestamps are maintained at millisecond resolution using the ESP32's internal real-time clock and are recorded in the CSV log for post-processing correlation with external instrumentation
+\subsubsection{Communication and Logging Module}
+Development Technologies and Toolchains}
+
+\subsubsection{Development and Build Framework}
+
+The project is developed using PlatformIO, a professional open-source embedded systems development platform that provides abstraction over vendor-specific toolchains and build systems. PlatformIO offers several critical advantages for this multi-target project:
+
+\begin{itemize}
+    \item \textbf{Unified Build System:} Single configuration file (platformio.ini) defines all Teensy 4.0 and ESP32 build targets, build flags, and linker options, eliminating toolchain configuration duplication.
+    \item \textbf{Dependency Management:} Automatic resolution and integration of third-party libraries (e.g., FreeRTOS, ESP-IDF) with version pinning for reproducibility.
+    \item \textbf{Serial Monitoring and Debugging:} Integrated terminal for real-time serial output visualization at configurable baud rates (115200 baud for this project).
+    \item \textbf{Optimization Profiles:} Compiler flags automatically configured for each target architecture, including CPU-specific optimizations (-mcpu=cortex-m7 for Teensy, -mcpu=esp32 for ESP32).
+    \item \textbf{Consistent Development Environment:} Encapsulation ensures reproducible builds across developer machines and continuous integration platforms.
+\end{itemize}
+
+\subsubsection{Language Standards and Compilation}
+
+All firmware code is written in C++17 (ISO/IEC 14882:2017), selected to leverage modern language features that improve code safety and reduce runtime overhead:
+
+\begin{itemize}
+    \item \textbf{constexpr:} Compile-time constant expressions enable the precomputation of sensor calibration tables and matrix operations, reducing runtime overhead.
+    \item \textbf{Inline Functions:} Strategic inlining of small functions (e.g., sensor correction functions) enables compiler optimizations and eliminates function-call overhead in performance-critical paths.
+    \item \textbf{Type Safety:} Strongly-typed C++ reduces the risk of memory corruption compared to C and simplifies debugging of heterogeneous sensor interfaces.
+\end{itemize}
+, Validation, and Performance Characterization}
+
+\subsubsection{Distance Measurement Calibration and Characterization}
+
+Each of the four ultrasonic sensors underwent comprehensive empirical characterization to quantify and correct systematic measurement errors. The calibration procedure follows these steps:
+
+\begin{enumerate}
+    \item \textbf{Ground-Truth Distance Establishment:} A precision linear stage was used to position a calibration target at 16 known distances spanning the operational range: 500, 1000, 1500, 2000, 2500, 3000, 3500, and 4000 mm.
+    \item \textbf{Measurement Acquisition:} At each distance, 20 distance measurements were acquired from each sensor and recorded. The arithmetic mean of the 20 samples was computed as the sensor reading for that distance.
+    \item \textbf{Regression Analysis:} For each sensor, a linear least-squares regression was performed on the (true distance, measured distance) pairs to determine the optimal parameters $a$ and $b$ for the model $d_{\text{true}} = a \cdot d_{\text{measured}} + b$. Equivalently, the correction function is $d_{\text{corrected}} = (d_{\text{measured}} + b') / a'$ where $b' = -b$ and $a' = a$.
+    \item \textbf{Residual Analysis:} Post-calibration residuals (differences between corrected measured values and true distances) were examined for normality and homoscedasticity. Residuals exhibited standard deviations below 2\% of true distance, validating the linear model.
+\end{enumerate}
+
+The resulting calibration coefficients, presented earlier in the Sensor Acquisition Module section, demonstrate excellent fit quality: $R^2 \geq 0.999$ for all sensors. These coefficients are hardcoded as constexpr functions in the firmware, enabling compile-time optimization by the C++ compiler.
+
+\subsubsection{Positioning Algorithm Validation and Performance}
+
+The three positioning algorithms were validated through comprehensive Monte Carlo simulation studies. The validation procedure is as follows:
+
+\begin{enumerate}
+    \item \textbf{Synthetic Position Generation:} Target positions $\vec{x}_{\text{true}}$ were drawn uniformly at random from the interior of the $4000 \times 4000$ mm positioning region. This ensures representative coverage of the entire operating area.
+    \item \textbf{Distance Computation:} For each generated target position, the Euclidean distances to each anchor were computed: $d_i = \|\vec{x}_{\text{true}} - \vec{a}_i\|$ for $i = 1, 2, 3, 4$.
+    \item \textbf{Noise Injection:} Gaussian noise with standard deviation $\sigma = 5$ mm (representative of typical ultrasonic measurement noise) was added to each distance: $d_i^{\text{meas}} = d_i + \mathcal{N}(0, 5^2)$.
+    \item \textbf{Algorithm Execution:} Each positioning algorithm was executed on the noisy distance vector $\{d_1^{\text{meas}}, d_2^{\text{meas}}, d_3^{\text{meas}}, d_4^{\text{meas}}\}$ to produce a position estimate $\vec{x}_{\text{est}}$.
+    \item \textbf{Error Quantification:} The Euclidean position error $e = \|\vec{x}_{\text{est}} - \vec{x}_{\text{true}}\|$ was computed for each trial.
+    \item \textbf{Statistical Aggregation:} Over 500 independent Monte Carlo trials, the following error statistics were computed: minimum, maximum, mean, and standard deviation.
+\end{enumerate}
+
+Detailed results are presented in the Results section (Table \ref{tab:exec_time}). In summary, the FGLS algorithm achieves mean positioning errors of approximately 2.4 mm with standard deviation 1.88 mm, significantly outperforming both trilateration and OLS. This superior accuracy validates the theoretical advantage of heteroscedastic error modeling in ultrasonic positioning
+    \item \textbf{Synchronization:} Binary semaphores protect shared data structures (e.g., the ring buffer), preventing race conditions and data corruption.
+    \item \textbf{Deterministic Behavior:} Real-time scheduling guarantees enable predictable worst-case latencies for safety-critical operations.
+\end{itemize}
+
+The Teensy 4.0 executes bare-metal firmware without an operating system, enabling deterministic single-threaded execution of the positioning loop with minimal latency and memory overhead.
+
+\subsubsection{Numerical Computing and Linear Algebra}
+
+The position estimation algorithms rely on fundamental linear algebra operations: 2$\times$2 matrix inversion, 3$\times$3 matrix inversion, $3 \times 2$ matrix-vector multiplication, and matrix-matrix products. To optimize execution time on resource-constrained microcontrollers, we implement specialized routines for fixed-size matrices rather than using generic linear algebra libraries:
+
+\begin{itemize}
+    \item \textbf{2$\times$2 Matrix Inversion:} Computed using the analytical formula with Cramer's rule; determinant singularity checked against $\epsilon_{\text{det}} = 10^{-6}$.
+    \item \textbf{3$\times$3 Matrix Inversion:} Computed using the cofactor method (adjugate matrix divided by determinant).
+    \item \textbf{Floating-Point Precision:} All computations use IEEE 754 single-precision (32-bit) floating-point arithmetic, providing sufficient precision (approximately 7 significant decimal digits) for millimeter-level positioning while minimizing memory and computation time.
+    \item \textbf{Numerical Stability:} Algorithms include checks for ill-conditioned matrices (near-singular determinants) to detect degenerate geometric configurations.
+\end{itemize}
+\subsubsection{Numerical Algorithms}
+
+Position estimation relies on fundamental linear algebra operations: matrix inversion, matrix-vector multiplication, and matrix multiplication. All algorithms operate on fixed-size matrices (2$\times$2, 3$\times$3, and rectangular matrices up to 3$\times$2) with efficient implementations using unrolled loops and careful management of floating-point precision.
+
+\subsection{Calibration and Validation}
+
+\subsubsection{Distance Measurement Calibration}
+
+All sensors underwent empirical calibration by measuring distances to known targets at intervals across the operational range. Linear regression was applied to the measured versus true distance pairs, yielding the correction coefficients presented in the sensor acquisition module. Calibration data demonstrated measurement errors within $\pm$2\% across the 0.5 m to 4 m range.
+
+\subsubsection{Positioning Accuracy}
+
+The positioning algorithms were validated through Monte Carlo simulation. True positions were drawn uniformly from the valid region, corresponding distances computed, and Gaussian noise (standard deviation 5 mm) was added. The algorithms were then executed on the simulated measurements, and positioning error statistics were computed. Results are presented in the Results section.
