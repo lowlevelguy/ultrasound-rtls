@@ -20,7 +20,7 @@ inline float s3_correct(float meas) {
     return (meas + 19.9f) / 0.9713f;
 }
 inline float s4_correct(float meas) {
-    return meas;
+    return (meas + 43.8f) / 1.07f;
 }
 
 inline uint8_t highlow_checksum(uint8_t s, uint8_t h, uint8_t l) {

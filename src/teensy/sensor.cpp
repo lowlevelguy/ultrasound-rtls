@@ -71,13 +71,12 @@ int32_t read_sensor(int sensor_index) {
     if (buffer[0] != 0xFF)
         return -1;
 
-    uint8_t high_byte = buffer[1], low_byte  = buffer[2],
-        checksum = sensors[sensor_index].checksum(0xFF, high_byte, low_byte);
+    uint8_t checksum = sensors[sensor_index].checksum(buffer[0], buffer[1], buffer[2]);
 
     if (checksum != buffer[3])
         return -1;
 
-    float result = (float)((high_byte << 8) | low_byte);
+    float result = (float)((buffer[1] << 8) | buffer[2]);
     result = sensors[sensor_index].correct_error(result);
     return ceil(result);
 }
