@@ -1,10 +1,11 @@
 #include "esp32/log_local.h"
 #include <LittleFS.h>
 #include "esp32/config.h"
+#include <stdatomic.h>
 
 static log_queue_entry_t log_queue[2][QUEUE_SIZE];
 static uint32_t queue_index = 0;
-static uint32_t buffer_index = 0;
+static _Atomic uint32_t buffer_index = 0;
 SemaphoreHandle_t buffer_mutex = NULL;
 TaskHandle_t logger_handle = NULL;
 static uint32_t bad_pkts_counter = 0;
@@ -59,10 +60,8 @@ static void on_read(const float* pos, const uint32_t timestamp) {
     queue_index++;
 
     if(queue_index >= QUEUE_SIZE) {
-        xSemaphoreTake(buffer_mutex, portMAX_DELAY);
-        buffer_index = 1 - buffer_index;
+        atomic_fetch_xor(&buffer_index, 1);
         xTaskNotify(logger_handle, 1-buffer_index, eSetValueWithOverwrite);
-        xSemaphoreGive(buffer_mutex);
         queue_index = 0;
     }
 }

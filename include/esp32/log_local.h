@@ -1,8 +1,8 @@
 #pragma once
 #include "FS.h"
 #include <freertos/FreeRTOS.h>
-#include <freertos/semphr.h>
 #include <freertos/task.h>
+#include <stdint.h>
 
 #define LOG_FILE_PATH "/log.csv"
 #define QUEUE_SIZE 10
