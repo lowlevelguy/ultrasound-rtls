@@ -1,7 +1,7 @@
 #include <string.h>
 #include <math.h>
 #include "teensy/position.h"
-#include "config.h"
+#include "teensy/config.h"
 
 #ifndef CONFIG_ANCHOR_POS
 #error "Please define anchor_pos in config.h"
@@ -9,7 +9,7 @@
 
 #define EPS_DET 1e-6f
 #define STEP_GN 1e-2f
-#define MAX_ITERATIONS_GN 4
+#define MAX_ITERATIONS_GN 8
 
 
 /********** HELPER FUNCTIONS **********/

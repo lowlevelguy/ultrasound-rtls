@@ -7,7 +7,18 @@ float max_count, min_count, mean, variance;
 
 float rand_stdnormal();
 
+/* Teensy specific functions for cycle count */
+inline void enable_cyccounter() {
+    ARM_DEMCR |= ARM_DEMCR_TRCENA;
+    ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
+}
+
+inline uint32_t get_cyccount() {
+    return ARM_DWT_CYCCNT;
+}
+
 void setup() {
+    enable_cyccounter();
     Serial.begin(115200);
 
     // Generate inputs
@@ -38,15 +49,13 @@ void setup() {
         dists[i][3] += (uint16_t)(sigma * rand_stdnormal());
 
 //        position_fgls(dists, sigma*sigma, pos);
-//        position_mle(dists, pos)
+//        position_mle(dists[i], pos);
     }
 
     for (int i = 0; i < 301; i++) {
-        portDISABLE_INTERRUPTS();
-        start_cycle = esp_cpu_get_ccount();
-        position_mle(dists[i], pos[i]);
-        cycle_counts[i] = (float)(esp_cpu_get_ccount() - start_cycle);
-        portENABLE_INTERRUPTS();
+        start_cycle = get_cyccount();
+        position_fgls(dists[i], sigma*sigma, pos[i]);
+        cycle_counts[i] = (float)(get_cyccount() - start_cycle);
     }
 
     // Stats for position estimation accuracy

@@ -1,5 +1,5 @@
 #include "teensy/log.h"
-#include "config.h"
+#include "teensy/config.h"
 
 #ifndef CONFIG_TLOG_SERIAL
 #error "Please define tlog_serial in config.h"

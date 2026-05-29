@@ -23,7 +23,6 @@ int initialize_log_file(fs::FS *file_s) {
 
 // saves the contents of the queue to the log file, returns 0 on success and -1 on failure
 static int save_to_file(fs::FS *file_s, uint32_t buffer_index) {
-
     File file = file_s->open(LOG_FILE_PATH, FILE_APPEND);
 
     if(!file) {
