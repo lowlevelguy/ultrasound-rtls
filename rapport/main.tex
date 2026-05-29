@@ -1,0 +1,138 @@
+\documentclass{scrartcl}
+\usepackage[a4paper, total={7in, 9.5in}]{geometry}
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage{fontspec}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{placeins}
+\usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usepackage[font=small, justification=centering, format=plain, indention=0pt]{caption}
+\usepackage[indent]{parskip}
+\usepackage{unicode-math}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{booktabs}
+
+
+
+\setmainfont{tex-gyre-pagella.regular}[
+    Path=../fonts/,
+    Extension=.otf,
+    BoldFont=tex-gyre-pagella.bold,
+    ItalicFont=tex-gyre-pagella.italic,
+    BoldItalicFont=tex-gyre-pagella.bold-italic,
+]
+\setmathfont{texgyrepagella-math}[
+    Path=../fonts/,
+    Extension=.otf,
+]
+
+\KOMAoptions{DIV=14}
+\KOMAoptions{fontsize=12pt}
+\KOMAoptions{BCOR=0mm}
+
+\def\eps{\varepsilon}
+\def\vphi{\varphi}
+\def\bR{\mathbb R}
+\def\bC{\mathbb C}
+\def\bE{\mathbb E}
+\def\bP{\mathbb P}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\newtheorem{Theorem}{Theorem}
+\newtheorem{Proposition}{Theorem}
+\newtheorem{Lemma}[Theorem]{Lemma}
+\newtheorem{Corollary}[Theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{Definition}[Theorem]{Definition}
+
+\setlength\parskip{4pt}
+
+\renewcommand*{\thefootnote}{[\arabic{footnote}]}
+
+
+\begin{document}
+\begin{titlepage}
+    \noindent
+    \begin{tabular}{@{}m{0.3\textwidth}@{} m{0.4\textwidth}@{} m{0.3\textwidth}@{}}
+        \includegraphics[width=3cm]{imgs/insat} &
+        \centering
+            \textsc{Carthage University}\\[.2cm]
+            \textsc{National Institute of Applied}\\
+            \textsc{Sciences and Technology} &
+        \raggedleft
+        \includegraphics[width=3cm]{imgs/ucar}
+    \end{tabular}
+    \vfill
+    
+    \centering
+        \textsc{\LARGE Professional Personal Project}\\[.7cm]
+        \textsc{\large as part of the}\\[.7cm]
+        \textsc{\Large National Engineering Diploma}\\[.3cm]
+        \textsc{\large in Networks and Telecommunications}
+    \vfill
+    
+    \rule{\linewidth}{0.2 mm}\\[1 cm]
+    {\huge \bfseries Ultrasound-Based Indoors Real-Time Location System}\\[.7 cm]
+    \rule{\linewidth}{0.2 mm}
+    \vfill
+    
+        {\large\bfseries Authors:}\\[.2cm]
+        {\large \textsc{Ben Fraj} Mohamed Amine, \hspace{1.5em} \textsc{Brahim} Amine,}\\[.2cm]
+        {\large \textsc{Eladab} Youssef, \hspace{1.5em} \textsc{Ilehi} Alaa}
+        \\[1cm]
+    {\large\bfseries Supervisor:}\\[.2cm]
+    {\large \textsc{Miled Souid} Wided}\\[.2cm]
+    \vfill
+    {\large June 2026}
+\end{titlepage}
+
+\large
+
+% Acknowledgements Page
+\clearpage
+\thispagestyle{empty}
+
+\begin{center}
+  {\Large\rmfamily\bfseries Acknowledgments}
+\end{center}
+
+We would like to extend our thanks towards...
+
+% Abstract Page
+\clearpage
+
+\begin{center}
+  {\Large\bfseries Abstract}
+\end{center}
+
+\vspace{1em}
+
+\noindent
+Your abstract text...
+
+\pagebreak
+\tableofcontents
+
+\pagebreak
+\section{Introduction}
+Intro text...
+
+% Background section goes in background.tex 
+\include{background}
+
+% Math section goes in math.tex
+\include{math}
+
+% Implementation section goes in implementation.tex
+\include{implementation}
+
+% Results section goes in results.tex
+\include{results}
+
+\end{document}
