@@ -16,6 +16,7 @@ typedef struct {
     SerialHandle_t serial;
     uint8_t trigger;
     float (*correct_error)(float);
+    uint8_t (*checksum)(uint8_t, uint8_t, uint8_t);
 } sensor_t;
 
 int sensor_begin(int sensor_index, int baud_rate);

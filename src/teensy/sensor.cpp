@@ -72,7 +72,7 @@ int32_t read_sensor(int sensor_index) {
         return -1;
 
     uint8_t high_byte = buffer[1], low_byte  = buffer[2],
-        checksum  = high_byte + low_byte;
+        checksum = sensors[sensor_index].checksum(0xFF, high_byte, low_byte);
 
     if (checksum != buffer[3])
         return -1;

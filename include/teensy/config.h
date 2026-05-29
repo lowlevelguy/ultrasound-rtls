@@ -22,11 +22,18 @@ inline float s3_correct(float meas) {
 inline float s4_correct(float meas) {
     return meas;
 }
+
+inline uint8_t highlow_checksum(uint8_t s, uint8_t h, uint8_t l) {
+    return h+l;
+}
+inline uint8_t starthighlow_checksum(uint8_t s, uint8_t h, uint8_t l) {
+    return s+h+l;
+}
 inline sensor_t sensors[4] = {
-    {{.type = SerialHandle_t::HW, .hw = &Serial1}, 0x01, &s1_correct},
-    {{.type = SerialHandle_t::HW, .hw = &Serial2}, 0x01, &s2_correct},
-    {{.type = SerialHandle_t::HW, .hw = &Serial3}, 0x01, &s3_correct},
-    {{.type = SerialHandle_t::HW, .hw = &Serial4}, 0x55, &s4_correct}
+    {{.type = SerialHandle_t::HW, .hw = &Serial1}, 0x01, &s1_correct, &highlow_checksum},
+    {{.type = SerialHandle_t::HW, .hw = &Serial2}, 0x01, &s2_correct, &highlow_checksum},
+    {{.type = SerialHandle_t::HW, .hw = &Serial3}, 0x01, &s3_correct, &highlow_checksum},
+    {{.type = SerialHandle_t::HW, .hw = &Serial4}, 0x55, &s4_correct, &starthighlow_checksum}
 };
 
 #define CONFIG_TLOG_SERIAL
