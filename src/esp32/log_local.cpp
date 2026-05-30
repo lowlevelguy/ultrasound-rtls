@@ -1,13 +1,12 @@
 #include "esp32/log_local.h"
-#include <LittleFS.h>
 #include "esp32/config.h"
 #include <atomic>
 
 static log_queue_entry_t log_queue[2][QUEUE_SIZE];
 static uint32_t queue_index = 0;
 static std::atomic<uint32_t> buffer_index = 0;
-SemaphoreHandle_t buffer_mutex = NULL;
 TaskHandle_t logger_handle = NULL;
+TaskHandle_t uart_handle = NULL;
 static uint32_t bad_pkts_counter = 0;
 
 int initialize_log_file(fs::FS *file_s) {
@@ -69,14 +68,17 @@ static void on_read(const float* pos, const uint32_t timestamp) {
     }
 }
 
-void uart_recieve(void* param) {
+void uart_receive(void* param) {
+    uint8_t buffer[sizeof(log_packet_t)];
+    log_packet_t log_packet;
+    ack_packet_t ack;
+    ack.start = START_BYTE;
     while(1) {
         while(esplog_serial->available() < (int)sizeof(log_packet_t)) {
             vTaskDelay(pdMS_TO_TICKS(100));
         }
-        uint8_t buffer[sizeof(log_packet_t)];
+        
         esplog_serial->readBytes(buffer, sizeof(log_packet_t));
-        log_packet_t log_packet;
         memcpy(&log_packet, buffer, sizeof(log_packet_t));
 
         if((log_packet.start != START_BYTE) || 
@@ -87,8 +89,6 @@ void uart_recieve(void* param) {
         
         on_read(log_packet.pos, log_packet.timestamp);
 
-        ack_packet_t ack;
-        ack.start = START_BYTE;
         ack.timestamp = log_packet.timestamp;
         esplog_serial->write((uint8_t*)&ack, sizeof(ack_packet_t));
     }

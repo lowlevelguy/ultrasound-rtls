@@ -1,6 +1,7 @@
 #pragma once
 #include "FS.h"
 #include <freertos/FreeRTOS.h>
+#include <LittleFS.h>
 #include <freertos/task.h>
 #include <stdint.h>
 
@@ -8,8 +9,8 @@
 #define QUEUE_SIZE 10
 #define START_BYTE 0xAA
 
-extern SemaphoreHandle_t buffer_mutex;
 extern TaskHandle_t logger_handle;
+extern TaskHandle_t uart_handle;
 
 typedef struct logQueueEntry {
     float x;
@@ -30,5 +31,5 @@ typedef struct {
 } __attribute__((packed)) ack_packet_t;
 
 int initialize_log_file(fs::FS *fs);
-void uart_recieve(void* param);
+void uart_receive(void* param);
 void logger_task(void* file_s);
