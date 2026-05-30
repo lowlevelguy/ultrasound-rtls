@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RTLS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f2;
+  --surface:#ffffff;
+  --border:#e2e0dc;
+  --border2:#cccac5;
+  --text:#1a1916;
+  --muted:#8c8880;
+  --accent:#3a6bc4;
+  --accent-s:#eef2fb;
+  --ok:#2d8a4e;
+  --warn:#b86e00;
+  --err:#c0392b;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;display:grid;grid-template-rows:52px 1fr;grid-template-columns:1fr 256px;height:100vh}
+
+header{
+  grid-column:1/-1;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  padding:0 20px;gap:12px;
+}
+.wm{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:var(--text);letter-spacing:.02em}
+.wm em{color:var(--muted);font-style:normal;font-weight:400}
+#cpill{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted)}
+#cdot{width:7px;height:7px;border-radius:50%;background:var(--err);transition:background .3s;flex-shrink:0}
+#cdot.ok{background:var(--ok)}
+#cdot.w{background:var(--warn)}
+
+#map-wrap{
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;overflow:hidden;
+  background:var(--bg);
+}
+canvas{
+  display:block;
+  border-radius:8px;
+  border:1px solid var(--border);
+  box-shadow:0 1px 4px rgba(0,0,0,0.06);
+}
+
+#spd{
+  position:absolute;bottom:28px;left:28px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:4px;padding:3px 8px;pointer-events:none;
+}
+
+aside{
+  border-left:1px solid var(--border);
+  background:var(--surface);
+  display:flex;flex-direction:column;
+  overflow-y:auto;overflow-x:hidden;
+}
+.pnl{border-bottom:1px solid var(--border);padding:16px}
+.pt{font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+
+.field{margin-bottom:8px}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+.field input[type=text]{
+  width:100%;background:var(--bg);border:1px solid var(--border);
+  color:var(--text);font-family:'JetBrains Mono',monospace;
+  font-size:12px;padding:6px 8px;border-radius:5px;outline:none;
+  transition:border-color .15s;
+}
+.field input[type=text]:focus{border-color:var(--accent)}
+
+.brow{display:flex;gap:6px;margin-top:10px}
+button{
+  flex:1;background:none;border:1px solid var(--border2);
+  color:var(--text);font-family:'Inter',sans-serif;font-size:11px;font-weight:500;
+  padding:7px 10px;border-radius:5px;cursor:pointer;transition:background .12s,border-color .12s;
+}
+button:hover{background:var(--bg)}
+button.p{background:var(--accent);border-color:var(--accent);color:#fff}
+button.p:hover{background:#2f5aaa}
+button.d{border-color:#e2c5c3;color:var(--err)}
+button.d:hover{background:#fdf2f2}
+
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+.stat-label{font-size:10px;color:var(--muted);margin-bottom:3px}
+.stat-val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:500;line-height:1.1;color:var(--text)}
+.stat-val.a{color:var(--accent)}
+.stat-unit{font-size:10px;color:var(--muted);font-weight:400}
+
+#logbox{
+  font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);
+  flex:1;overflow-y:auto;display:flex;flex-direction:column-reverse;
+  gap:2px;padding:14px 16px;
+}
+.ll{color:var(--text)}
+.le{color:var(--err)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wm">RTLS <em>/ monitor</em></div>
+  <div id="cpill"><div id="cdot"></div><span id="clabel">not connected</span></div>
+</header>
+
+<div id="map-wrap">
+  <canvas id="map"></canvas>
+  <div id="spd">-- mm/s</div>
+</div>
+
+<aside>
+  <div class="pnl">
+    <div class="pt">Connection</div>
+    <div class="field"><label>Host</label><input type="text" id="host" value="192.168.1.131"></div>
+    <div class="field"><label>Port</label><input type="text" id="port" value="9001"></div>
+    <div class="brow">
+      <button class="p" id="bcn" onclick="toggleConn()">Connect</button>
+      <button class="d" onclick="clearAll()">Clear</button>
+    </div>
+  </div>
+
+  <div class="pnl">
+    <div class="pt">Live Position</div>
+    <div class="g2">
+      <div><div class="stat-label">X</div><div class="stat-val a" id="sx">--<span class="stat-unit"> mm</span></div></div>
+      <div><div class="stat-label">Y</div><div class="stat-val a" id="sy">--<span class="stat-unit"> mm</span></div></div>
+    </div>
+    <div class="g2" style="margin-top:12px">
+      <div><div class="stat-label">Update rate</div><div class="stat-val" id="srate">--<span class="stat-unit"> Hz</span></div></div>
+      <div><div class="stat-label">Total points</div><div class="stat-val" id="spts">0</div></div>
+    </div>
+  </div>
+
+  <div id="logbox"></div>
+</aside>
+
+<script>
+const ROOM=4000,TOPIC='rtls/position',ANCH=[[0,0],[4000,0],[0,4000],[4000,4000]],PAD=40,TRAIL=14;
+let client=null,trail=[],allPts=0,msgTimes=[];
+let dotX=0,dotY=0,tgtX=0,tgtY=0,hasDot=false;
+const canvas=document.getElementById('map'),ctx=canvas.getContext('2d');
+let sz=0,sc=0,ox=0,oy=0;
+
+function resize(){
+  const w=document.getElementById('map-wrap');
+  sz=Math.min(w.clientWidth-36,w.clientHeight-36);
+  canvas.width=canvas.height=sz;sc=(sz-PAD*2)/ROOM;ox=oy=PAD;
+}
+window.addEventListener('resize',resize);
+function tp(x,y){return[ox+x*sc,oy+(ROOM-y)*sc]}
+
+function frame(){
+  requestAnimationFrame(frame);
+  if(hasDot){dotX+=(tgtX-dotX)*0.11;dotY+=(tgtY-dotY)*0.11}
+
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,sz,sz);
+
+  // grid
+  for(let v=0;v<=ROOM;v+=500){
+    const major=v%2000===0;
+    ctx.strokeStyle=major?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.04)';
+    ctx.lineWidth=major?0.8:0.5;
+    const[cx]=tp(v,0);const[,cy]=tp(0,v);
+    ctx.beginPath();ctx.moveTo(cx,oy);ctx.lineTo(cx,oy+ROOM*sc);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ox,cy);ctx.lineTo(ox+ROOM*sc,cy);ctx.stroke();
+  }
+
+  // border
+  ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=1;
+  ctx.strokeRect(ox,oy,ROOM*sc,ROOM*sc);
+
+  // axis labels
+  ctx.font='9px JetBrains Mono,monospace';ctx.fillStyle='rgba(0,0,0,0.25)';
+  ctx.textAlign='center';
+  for(let v=0;v<=ROOM;v+=1000){const[cx,cy]=tp(v,0);ctx.fillText(v,cx,cy+13)}
+  ctx.textAlign='right';
+  for(let v=0;v<=ROOM;v+=1000){const[cx,cy]=tp(0,v);ctx.fillText(v,cx-5,cy+3)}
+
+  // anchors
+  ANCH.forEach(([ax,ay],i)=>{
+    const[cx,cy]=tp(ax,ay);
+    ctx.save();ctx.translate(cx,cy);
+    ctx.fillStyle='#b0aaa0';
+    ctx.beginPath();ctx.moveTo(0,-5);ctx.lineTo(4,3);ctx.lineTo(-4,3);ctx.closePath();ctx.fill();
+    ctx.restore();
+    ctx.font='8px JetBrains Mono,monospace';ctx.fillStyle='rgba(0,0,0,0.2)';
+    ctx.textAlign='left';ctx.fillText('A'+i,cx+6,cy+3);
+  });
+
+  // trail — short, warm, subtle
+  if(trail.length>1){
+    ctx.lineCap='round';ctx.lineJoin='round';
+    for(let i=1;i<trail.length;i++){
+      const t=i/trail.length;
+      const[x1,y1]=tp(trail[i-1].x,trail[i-1].y);
+      const[x2,y2]=tp(trail[i].x,trail[i].y);
+      ctx.strokeStyle=`rgba(58,107,196,${t*0.35})`;
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    }
+  }
+
+  // dot
+  if(hasDot){
+    const[cx,cy]=tp(dotX,dotY);
+
+    // soft shadow ring
+    const g=ctx.createRadialGradient(cx,cy,3,cx,cy,16);
+    g.addColorStop(0,'rgba(58,107,196,0.12)');g.addColorStop(1,'rgba(58,107,196,0)');
+    ctx.beginPath();ctx.arc(cx,cy,16,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+
+    // outer ring
+    ctx.beginPath();ctx.arc(cx,cy,8,0,Math.PI*2);
+    ctx.strokeStyle='rgba(58,107,196,0.25)';ctx.lineWidth=1.5;ctx.stroke();
+
+    // core
+    ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);
+    ctx.fillStyle='#3a6bc4';ctx.fill();
+
+    // specular
+    ctx.beginPath();ctx.arc(cx-1.2,cy-1.2,1.4,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.65)';ctx.fill();
+
+    // label
+    ctx.font='10px JetBrains Mono,monospace';
+    ctx.fillStyle='rgba(58,107,196,0.7)';
+    ctx.textAlign='left';
+    ctx.fillText(`${dotX.toFixed(0)}, ${dotY.toFixed(0)}`,cx+13,cy-4);
+  }
+}
+
+function onPoint(x,y,ts){
+  if(!hasDot){dotX=x;dotY=y}
+  tgtX=x;tgtY=y;hasDot=true;
+  trail.push({x,y});if(trail.length>TRAIL)trail.shift();
+  allPts++;
+  document.getElementById('spts').textContent=allPts;
+  document.getElementById('sx').innerHTML=`${x.toFixed(0)}<span class="stat-unit"> mm</span>`;
+  document.getElementById('sy').innerHTML=`${y.toFixed(0)}<span class="stat-unit"> mm</span>`;
+  const now=Date.now();
+  msgTimes.push(now);msgTimes=msgTimes.filter(t=>now-t<2000);
+  document.getElementById('srate').innerHTML=`${(msgTimes.length/2).toFixed(1)}<span class="stat-unit"> Hz</span>`;
+  if(trail.length>=2){
+    const p=trail[trail.length-2],dt=(ts-(ts-100))/1000||0.1;
+    const s=Math.sqrt((x-p.x)**2+(y-p.y)**2)/dt;
+    if(s<20000)document.getElementById('spd').textContent=s.toFixed(0)+' mm/s';
+  }
+}
+
+function setCS(s){
+  const d=document.getElementById('cdot'),l=document.getElementById('clabel'),b=document.getElementById('bcn');
+  if(s==='on'){d.className='ok';l.textContent='connected';b.textContent='Disconnect';b.className='d';}
+  else if(s==='c'){d.className='w';l.textContent='connecting';b.textContent='Cancel';b.className='';}
+  else{d.className='';l.textContent='not connected';b.textContent='Connect';b.className='p';}
+}
+
+function toggleConn(){
+  if(client&&client.connected){client.end();setCS('off');log('disconnected');return;}
+  const h=document.getElementById('host').value.trim();
+  const p=document.getElementById('port').value.trim();
+  setCS('c');log('connecting to '+h+':'+p);
+  client=mqtt.connect('ws://'+h+':'+p+'/mqtt',{
+    clientId:'rtls-'+Math.random().toString(16).slice(2,8),
+    connectTimeout:6000,reconnectPeriod:0
+  });
+  client.on('connect',()=>{
+    setCS('on');log('connected');
+    client.subscribe(TOPIC,e=>e?log('subscribe failed',true):log('receiving '+TOPIC));
+  });
+  client.on('message',(_,msg)=>{
+    try{const d=JSON.parse(msg.toString());onPoint(+d.x,+d.y,+d.ts);}
+    catch(e){log('bad message',true);}
+  });
+  client.on('error',e=>{log('error: '+e.message,true);setCS('off');});
+  client.on('close',()=>{if(document.getElementById('cdot').className==='ok'){setCS('off');log('connection lost');}});
+}
+
+function clearAll(){
+  trail=[];allPts=0;hasDot=false;msgTimes=[];
+  document.getElementById('spts').textContent='0';
+  document.getElementById('spd').textContent='-- mm/s';
+  log('cleared');
+}
+
+function log(m,e=false){
+  const b=document.getElementById('logbox'),el=document.createElement('div');
+  el.className=e?'le':'ll';
+  el.textContent='['+new Date().toTimeString().slice(0,8)+'] '+m;
+  b.prepend(el);while(b.children.length>60)b.removeChild(b.lastChild);
+}
+
+resize();requestAnimationFrame(frame);
+</script>
+</body>
+</html>

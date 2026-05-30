@@ -1,4 +1,5 @@
 #include "esp32/log_local.h"
+#include "esp32/log_cloud.h"
 #include "esp32/config.h"
 #include <atomic>
 
@@ -8,6 +9,11 @@ static std::atomic<uint32_t> buffer_index = 0;
 TaskHandle_t logger_handle = NULL;
 TaskHandle_t uart_handle = NULL;
 static uint32_t bad_pkts_counter = 0;
+static QueueHandle_t _cloud_queue = NULL;
+
+void set_cloud_queue(QueueHandle_t q) {
+    _cloud_queue = q;
+}
 
 int initialize_log_file(fs::FS *file_s) {
     if(!file_s->exists(LOG_FILE_PATH)) {
@@ -68,6 +74,10 @@ static void on_read(const float* pos, const uint32_t timestamp) {
     }
 }
 
+void log_local_push(const float* pos, uint32_t timestamp) {
+    on_read(pos, timestamp);
+}
+
 void uart_receive(void* param) {
     uint8_t buffer[sizeof(log_packet_t)];
     log_packet_t log_packet;
@@ -88,6 +98,15 @@ void uart_receive(void* param) {
         }
         
         on_read(log_packet.pos, log_packet.timestamp);
+
+        if (_cloud_queue != NULL) {
+            log_queue_entry_t entry = {
+                .x         = log_packet.pos[0],
+                .y         = log_packet.pos[1],
+                .timestamp = (unsigned long)log_packet.timestamp
+            };
+            xQueueSend(_cloud_queue, &entry, 0);
+        }
 
         ack.timestamp = log_packet.timestamp;
         esplog_serial->write((uint8_t*)&ack, sizeof(ack_packet_t));

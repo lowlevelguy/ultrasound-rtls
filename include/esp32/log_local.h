@@ -1,8 +1,9 @@
 #pragma once
 #include "FS.h"
 #include <freertos/FreeRTOS.h>
-#include <LittleFS.h>
 #include <freertos/task.h>
+#include <freertos/queue.h>
+#include <LittleFS.h>
 #include <stdint.h>
 
 #define LOG_FILE_PATH "/log.csv"
@@ -33,3 +34,5 @@ typedef struct {
 int initialize_log_file(fs::FS *fs);
 void uart_receive(void* param);
 void logger_task(void* file_s);
+void set_cloud_queue(QueueHandle_t q);
+void log_local_push(const float* pos, uint32_t timestamp);
