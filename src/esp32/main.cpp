@@ -2,9 +2,6 @@
 #include "esp32/log_local.h"
 #include "esp32/config.h"
 
-#define RX_PIN 19
-#define TX_PIN 22
-
 void monitor_task(void* param) {
     while(1) {
         vTaskDelay(pdMS_TO_TICKS(5000));
@@ -58,7 +55,5 @@ void setup() {
 }
 
  
-void loop() {
-    
-}
+void loop() {}
 
