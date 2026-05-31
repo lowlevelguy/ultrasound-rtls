@@ -65,8 +65,9 @@ static void on_read(const float* pos, const uint32_t timestamp) {
     log_queue[buff_idx][queue_index].y = pos[1];
     log_queue[buff_idx][queue_index].timestamp = timestamp;
     queue_index++;
-
+    Serial.printf("updated queue\n");
     if(queue_index >= QUEUE_SIZE) {
+        Serial.printf("queue full\n");
         uint32_t full_buff_index = buffer_index.load();
         buffer_index.fetch_xor(1);
         xTaskNotify(logger_handle, full_buff_index, eSetValueWithOverwrite);
@@ -87,6 +88,7 @@ void uart_receive(void* param) {
         while(esplog_serial->available() < (int)sizeof(log_packet_t)) {
             vTaskDelay(pdMS_TO_TICKS(100));
         }
+        Serial.print("received packet\n");
         
         esplog_serial->readBytes(buffer, sizeof(log_packet_t));
         memcpy(&log_packet, buffer, sizeof(log_packet_t));
@@ -96,7 +98,7 @@ void uart_receive(void* param) {
             Serial.printf("bad packet recieved number: %u\n", bad_pkts_counter++);
             continue;
         }
-        
+        Serial.printf("position: %f, %f\n", log_packet.pos[0], log_packet.pos[1]);
         on_read(log_packet.pos, log_packet.timestamp);
 
         if (_cloud_queue != NULL) {
@@ -110,6 +112,7 @@ void uart_receive(void* param) {
 
         ack.timestamp = log_packet.timestamp;
         esplog_serial->write((uint8_t*)&ack, sizeof(ack_packet_t));
+        Serial.printf("sent ack: %x %u\n", ack.start, ack.timestamp);
     }
 }
 

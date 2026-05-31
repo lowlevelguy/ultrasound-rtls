@@ -30,16 +30,11 @@ void monitor_task(void* param) {
         Serial.printf("----------- stack high water marks: ----------\n");
         Serial.printf("logger task: %u words free\n", uxTaskGetStackHighWaterMark(logger_handle));
         Serial.printf("uart_receive task: %u words free\n", uxTaskGetStackHighWaterMark(uart_handle));
-        Serial.printf("----------- file contents: -------------------\n");
         File f = LittleFS.open(LOG_FILE_PATH, "r");
         if (!f) {
             Serial.println("[monitor] could not open log file");
             continue;
         }
-
-        Serial.println("\n[monitor] --- log file contents ---");
-        while (f.available()) Serial.write(f.read());
-        Serial.println("[monitor] --- end ---");
         f.close();
     }
 }
