@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RTLS</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -16,13 +15,12 @@
   --text:#1a1916;
   --muted:#8c8880;
   --accent:#3a6bc4;
-  --accent-s:#eef2fb;
   --ok:#2d8a4e;
   --warn:#b86e00;
   --err:#c0392b;
 }
 html,body{height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;display:grid;grid-template-rows:52px 1fr;grid-template-columns:1fr 256px;height:100vh}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;display:grid;grid-template-rows:52px 1fr;grid-template-columns:1fr 272px;height:100vh}
 
 header{
   grid-column:1/-1;
@@ -33,29 +31,27 @@ header{
 }
 .wm{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:var(--text);letter-spacing:.02em}
 .wm em{color:var(--muted);font-style:normal;font-weight:400}
-#cpill{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted)}
-#cdot{width:7px;height:7px;border-radius:50%;background:var(--err);transition:background .3s;flex-shrink:0}
-#cdot.ok{background:var(--ok)}
-#cdot.w{background:var(--warn)}
 
 #map-wrap{
   position:relative;
   display:flex;align-items:center;justify-content:center;
-  padding:20px;overflow:hidden;
-  background:var(--bg);
+  padding:20px;overflow:hidden;background:var(--bg);
 }
-canvas{
-  display:block;
-  border-radius:8px;
-  border:1px solid var(--border);
-  box-shadow:0 1px 4px rgba(0,0,0,0.06);
-}
+canvas{display:block;border-radius:8px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,0.06)}
 
-#spd{
+#time-badge{
   position:absolute;bottom:28px;left:28px;
-  font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);
+  font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);
   background:var(--surface);border:1px solid var(--border);
-  border-radius:4px;padding:3px 8px;pointer-events:none;
+  border-radius:4px;padding:4px 10px;pointer-events:none;
+  display:flex;align-items:center;gap:8px;
+}
+#gap-badge{
+  display:none;
+  position:absolute;top:28px;left:50%;transform:translateX(-50%);
+  font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--warn);
+  background:var(--surface);border:1px solid #f0d9b0;
+  border-radius:4px;padding:4px 12px;pointer-events:none;
 }
 
 aside{
@@ -69,122 +65,202 @@ aside{
 
 .field{margin-bottom:8px}
 .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
-.field input[type=text]{
+.field input{
   width:100%;background:var(--bg);border:1px solid var(--border);
   color:var(--text);font-family:'JetBrains Mono',monospace;
   font-size:12px;padding:6px 8px;border-radius:5px;outline:none;
   transition:border-color .15s;
 }
-.field input[type=text]:focus{border-color:var(--accent)}
+.field input:focus{border-color:var(--accent)}
 
 .brow{display:flex;gap:6px;margin-top:10px}
 button{
   flex:1;background:none;border:1px solid var(--border2);
   color:var(--text);font-family:'Inter',sans-serif;font-size:11px;font-weight:500;
-  padding:7px 10px;border-radius:5px;cursor:pointer;transition:background .12s,border-color .12s;
+  padding:7px 10px;border-radius:5px;cursor:pointer;transition:background .12s;
 }
 button:hover{background:var(--bg)}
 button.p{background:var(--accent);border-color:var(--accent);color:#fff}
 button.p:hover{background:#2f5aaa}
 button.d{border-color:#e2c5c3;color:var(--err)}
 button.d:hover{background:#fdf2f2}
+button:disabled{opacity:0.4;cursor:not-allowed}
 
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
 .stat-label{font-size:10px;color:var(--muted);margin-bottom:3px}
-.stat-val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:500;line-height:1.1;color:var(--text)}
+.stat-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:500;line-height:1.1;color:var(--text)}
 .stat-val.a{color:var(--accent)}
 .stat-unit{font-size:10px;color:var(--muted);font-weight:400}
 
-#logbox{
+.playbar{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.playbar button{flex:none;width:34px;font-size:13px;padding:5px}
+#pslider{flex:1;accent-color:var(--accent);cursor:pointer}
+.sr{margin-bottom:8px}
+.sr label{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px}
+.sr label span{font-family:'JetBrains Mono',monospace;color:var(--text)}
+input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+
+#console.logbox{
   font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);
   flex:1;overflow-y:auto;display:flex;flex-direction:column-reverse;
-  gap:2px;padding:14px 16px;
+  gap:2px;padding:14px 16px;height:200px;
 }
-.ll{color:var(--text)}
-.le{color:var(--err)}
+.ll{color:var(--text)}.le{color:var(--err)}.lw{color:var(--warn)}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="wm">RTLS <em>/ monitor</em></div>
-  <div id="cpill"><div id="cdot"></div><span id="clabel">not connected</span></div>
+  <div class="wm">RTLS <em>/ playback</em></div>
 </header>
 
 <div id="map-wrap">
   <canvas id="map"></canvas>
-  <div id="spd">-- mm/s</div>
+  <div id="time-badge"><span id="ttime">--:--:--.--</span></div>
+  <div id="gap-badge" id="gbadge">gap in data</div>
 </div>
 
 <aside>
+  <!-- InfluxDB config -->
   <div class="pnl">
-    <div class="pt">Connection</div>
-    <div class="field"><label>Host</label><input type="text" id="host" value="192.168.1.131"></div>
-    <div class="field"><label>Port</label><input type="text" id="port" value="9001"></div>
-    <div class="brow">
-      <button class="p" id="bcn" onclick="toggleConn()">Connect</button>
-      <button class="d" onclick="clearAll()">Clear</button>
-    </div>
+    <div class="pt">Database</div>
+    <div class="field"><label>Host</label><input id="ihost" value="http://192.168.100.14:8089"></div>
+    <div class="field"><label>Org</label><input id="iorg" value="rtls"></div>
+    <div class="field"><label>Bucket</label><input id="ibucket" value="positions"></div>
   </div>
 
+  <!-- Query -->
   <div class="pnl">
-    <div class="pt">Live Position</div>
-    <div class="g2">
+    <div class="pt">Query</div>
+    <div class="field"><label>Start time</label><input type="datetime-local" id="qstart" step="1"></div>
+    <div class="field"><label>Duration (minutes)</label><input id="qdur" value="60"></div>
+    <div class="brow">
+      <button class="p" id="bfetch" onclick="fetchData()">Load</button>
+      <button class="d" onclick="resetAll()">Reset</button>
+    </div>
+    <div style="margin-top:10px;font-size:10px;color:var(--muted)" id="qstatus">no data loaded</div>
+  </div>
+
+  <!-- Playback -->
+  <div class="pnl">
+    <div class="pt">Playback</div>
+    <div class="playbar">
+      <button id="bplay" onclick="playToggle()" disabled>play</button>
+      <input type="range" id="pslider" min="0" max="0" value="0" oninput="scrub(+this.value)" disabled>
+    </div>
+    <div class="sr">
+      <label>Speed <span id="splab">1x</span></label>
+      <input type="range" id="spslider" min="0.25" max="8" value="1" step="0.25"
+             oninput="PLAYBACK_SPEED=+this.value;document.getElementById('splab').textContent=this.value+'x'">
+    </div>
+    <div class="g2" style="margin-top:8px">
       <div><div class="stat-label">X</div><div class="stat-val a" id="sx">--<span class="stat-unit"> mm</span></div></div>
       <div><div class="stat-label">Y</div><div class="stat-val a" id="sy">--<span class="stat-unit"> mm</span></div></div>
     </div>
-    <div class="g2" style="margin-top:12px">
-      <div><div class="stat-label">Update rate</div><div class="stat-val" id="srate">--<span class="stat-unit"> Hz</span></div></div>
-      <div><div class="stat-label">Total points</div><div class="stat-val" id="spts">0</div></div>
+    <div class="g2" style="margin-top:8px">
+      <div><div class="stat-label">Points</div><div class="stat-val" id="spts">0</div></div>
+      <div><div class="stat-label">Speed</div><div class="stat-val" id="sspd">--<span class="stat-unit"> mm/s</span></div></div>
     </div>
   </div>
 
-  <div id="logbox"></div>
+  <div id="console.logbox"></div>
 </aside>
 
 <script>
-const ROOM=4000,TOPIC='rtls/position',ANCH=[[0,0],[4000,0],[0,4000],[4000,4000]],PAD=40,TRAIL=14;
-let client=null,trail=[],allPts=0,msgTimes=[];
-let dotX=0,dotY=0,tgtX=0,tgtY=0,hasDot=false;
-const canvas=document.getElementById('map'),ctx=canvas.getContext('2d');
-let sz=0,sc=0,ox=0,oy=0;
+// ── Config ────────────────────────────────────────────────────────────────────
+// How fast to play back relative to real time.
+// 1 = real speed, 2 = twice as fast, 0.5 = half speed.
+let PLAYBACK_SPEED = 1;
 
+const ROOM  = 4000;
+const ANCH  = [[0,0],[4000,0],[0,4000],[4000,4000]];
+const PAD   = 40;
+const TRAIL = 20;
+
+// Gap threshold — if two consecutive timestamps differ by more than this
+// (in ms), it is shown to the user as a gap in the data.
+const GAP_THRESHOLD_MS = 5000;
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let points   = [];   // [{x, y, ts_ms}]  sorted by ts_ms
+let trail    = [];
+let playIdx  = 0;
+let playing  = false;
+let lastWall = null; // wall-clock time of last frame when playing
+let dotX=0, dotY=0, tgtX=0, tgtY=0, hasDot=false;
+let accumulated = 0;
+
+const canvas = document.getElementById('map');
+const ctx    = canvas.getContext('2d');
+let sz=0, sc=0, ox=0, oy=0;
+
+// ── Canvas ────────────────────────────────────────────────────────────────────
 function resize(){
-  const w=document.getElementById('map-wrap');
-  sz=Math.min(w.clientWidth-36,w.clientHeight-36);
-  canvas.width=canvas.height=sz;sc=(sz-PAD*2)/ROOM;ox=oy=PAD;
+  const w = document.getElementById('map-wrap');
+  sz = Math.min(w.clientWidth-36, w.clientHeight-36);
+  canvas.width = canvas.height = sz;
+  sc = (sz-PAD*2)/ROOM; ox = oy = PAD;
 }
-window.addEventListener('resize',resize);
-function tp(x,y){return[ox+x*sc,oy+(ROOM-y)*sc]}
+window.addEventListener('resize', resize);
+function tp(x,y){ return [ox+x*sc, oy+(ROOM-y)*sc] }
 
-function frame(){
+// ── Render loop ───────────────────────────────────────────────────────────────
+function frame(now){
   requestAnimationFrame(frame);
-  if(hasDot){dotX+=(tgtX-dotX)*0.11;dotY+=(tgtY-dotY)*0.11}
 
-  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,sz,sz);
+  // Advance playback
+  if(playing && points.length > 0 && lastWall !== null){
+    const wallElapsed = (now - lastWall) * PLAYBACK_SPEED;
+    lastWall = now;
+    accumulated += wallElapsed;
 
-  // grid
+    while(playing && playIdx < points.length - 1){
+      const gap = points[playIdx+1].ts_ms - points[playIdx].ts_ms;
+      if(accumulated >= gap) {
+        accumulated -= gap;
+        playIdx++;
+        showGap(gap);
+        updatePlayState(playIdx);
+        if(playIdx >= points.length - 1){
+          playing = false;
+          document.getElementById('bplay').textContent = 'play';
+          lastWall = null;
+          accumulated = 0;
+        }
+      } else {
+        break;
+      }
+    }
+  }
+
+  // Smooth dot interpolation
+  if(hasDot){ dotX+=(tgtX-dotX)*0.12; dotY+=(tgtY-dotY)*0.12 }
+
+  // Draw
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,sz,sz);
+
+  // Grid
   for(let v=0;v<=ROOM;v+=500){
-    const major=v%2000===0;
-    ctx.strokeStyle=major?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.04)';
-    ctx.lineWidth=major?0.8:0.5;
-    const[cx]=tp(v,0);const[,cy]=tp(0,v);
+    const major = v%2000===0;
+    ctx.strokeStyle = major?'rgba(0,0,0,0.08)':'rgba(0,0,0,0.04)';
+    ctx.lineWidth   = major?0.8:0.5;
+    const[cx]=tp(v,0); const[,cy]=tp(0,v);
     ctx.beginPath();ctx.moveTo(cx,oy);ctx.lineTo(cx,oy+ROOM*sc);ctx.stroke();
     ctx.beginPath();ctx.moveTo(ox,cy);ctx.lineTo(ox+ROOM*sc,cy);ctx.stroke();
   }
 
-  // border
+  // Border
   ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=1;
   ctx.strokeRect(ox,oy,ROOM*sc,ROOM*sc);
 
-  // axis labels
+  // Axis labels
   ctx.font='9px JetBrains Mono,monospace';ctx.fillStyle='rgba(0,0,0,0.25)';
   ctx.textAlign='center';
   for(let v=0;v<=ROOM;v+=1000){const[cx,cy]=tp(v,0);ctx.fillText(v,cx,cy+13)}
   ctx.textAlign='right';
   for(let v=0;v<=ROOM;v+=1000){const[cx,cy]=tp(0,v);ctx.fillText(v,cx-5,cy+3)}
 
-  // anchors
+  // Anchors
   ANCH.forEach(([ax,ay],i)=>{
     const[cx,cy]=tp(ax,ay);
     ctx.save();ctx.translate(cx,cy);
@@ -195,7 +271,7 @@ function frame(){
     ctx.textAlign='left';ctx.fillText('A'+i,cx+6,cy+3);
   });
 
-  // trail — short, warm, subtle
+  // Trail
   if(trail.length>1){
     ctx.lineCap='round';ctx.lineJoin='round';
     for(let i=1;i<trail.length;i++){
@@ -208,96 +284,235 @@ function frame(){
     }
   }
 
-  // dot
+  // Dot
   if(hasDot){
     const[cx,cy]=tp(dotX,dotY);
-
-    // soft shadow ring
     const g=ctx.createRadialGradient(cx,cy,3,cx,cy,16);
     g.addColorStop(0,'rgba(58,107,196,0.12)');g.addColorStop(1,'rgba(58,107,196,0)');
     ctx.beginPath();ctx.arc(cx,cy,16,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
-
-    // outer ring
     ctx.beginPath();ctx.arc(cx,cy,8,0,Math.PI*2);
     ctx.strokeStyle='rgba(58,107,196,0.25)';ctx.lineWidth=1.5;ctx.stroke();
-
-    // core
-    ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);
-    ctx.fillStyle='#3a6bc4';ctx.fill();
-
-    // specular
+    ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fillStyle='#3a6bc4';ctx.fill();
     ctx.beginPath();ctx.arc(cx-1.2,cy-1.2,1.4,0,Math.PI*2);
     ctx.fillStyle='rgba(255,255,255,0.65)';ctx.fill();
-
-    // label
     ctx.font='10px JetBrains Mono,monospace';
-    ctx.fillStyle='rgba(58,107,196,0.7)';
-    ctx.textAlign='left';
+    ctx.fillStyle='rgba(58,107,196,0.7)';ctx.textAlign='left';
     ctx.fillText(`${dotX.toFixed(0)}, ${dotY.toFixed(0)}`,cx+13,cy-4);
   }
 }
 
-function onPoint(x,y,ts){
-  if(!hasDot){dotX=x;dotY=y}
-  tgtX=x;tgtY=y;hasDot=true;
-  trail.push({x,y});if(trail.length>TRAIL)trail.shift();
-  allPts++;
-  document.getElementById('spts').textContent=allPts;
-  document.getElementById('sx').innerHTML=`${x.toFixed(0)}<span class="stat-unit"> mm</span>`;
-  document.getElementById('sy').innerHTML=`${y.toFixed(0)}<span class="stat-unit"> mm</span>`;
-  const now=Date.now();
-  msgTimes.push(now);msgTimes=msgTimes.filter(t=>now-t<2000);
-  document.getElementById('srate').innerHTML=`${(msgTimes.length/2).toFixed(1)}<span class="stat-unit"> Hz</span>`;
-  if(trail.length>=2){
-    const p=trail[trail.length-2],dt=(ts-(ts-100))/1000||0.1;
-    const s=Math.sqrt((x-p.x)**2+(y-p.y)**2)/dt;
-    if(s<20000)document.getElementById('spd').textContent=s.toFixed(0)+' mm/s';
+// ── Gap display ───────────────────────────────────────────────────────────────
+let gapTimer = null;
+function showGap(gap_ms){
+  if(gap_ms < GAP_THRESHOLD_MS) return;
+  const b = document.getElementById('gap-badge');
+  const secs = (gap_ms/1000).toFixed(1);
+  b.textContent = `gap in data: ${secs}s`;
+  b.style.display = 'block';
+  clearTimeout(gapTimer);
+  gapTimer = setTimeout(()=>{ b.style.display='none'; }, 3000);
+}
+
+// ── Time formatting ───────────────────────────────────────────────────────────
+function fmtTime(ts_ms){
+  const d = new Date(ts_ms);
+  const h = d.getHours()%12||12;
+  const m = String(d.getMinutes()).padStart(2,'0');
+  const s = String(d.getSeconds()).padStart(2,'0');
+  const ms = String(d.getMilliseconds()).padStart(3,'0').slice(0,1); // tenths
+  const ampm = d.getHours()>=12?'PM':'AM';
+  return `${h}:${m}:${s}.${ms} ${ampm}`;
+}
+
+// ── Update UI for a given point index ────────────────────────────────────────
+function updatePlayState(idx){
+  if(!points.length) return;
+  const pt = points[idx];
+
+  tgtX = pt.x; tgtY = pt.y;
+  if(!hasDot){ dotX=pt.x; dotY=pt.y; }
+  hasDot = true;
+
+  trail.push({x:pt.x, y:pt.y});
+  if(trail.length>TRAIL) trail.shift();
+
+  document.getElementById('ttime').textContent = fmtTime(pt.ts_ms);
+  document.getElementById('pslider').value = idx;
+  document.getElementById('sx').innerHTML = `${pt.x.toFixed(0)}<span class="stat-unit"> mm</span>`;
+  document.getElementById('sy').innerHTML = `${pt.y.toFixed(0)}<span class="stat-unit"> mm</span>`;
+
+  if(idx>0){
+    const prev=points[idx-1];
+    const dt=(pt.ts_ms-prev.ts_ms)/1000;
+    if(dt>0){
+      const spd=Math.sqrt((pt.x-prev.x)**2+(pt.y-prev.y)**2)/dt;
+      document.getElementById('sspd').innerHTML=`${spd.toFixed(0)}<span class="stat-unit"> mm/s</span>`;
+    }
   }
 }
 
-function setCS(s){
-  const d=document.getElementById('cdot'),l=document.getElementById('clabel'),b=document.getElementById('bcn');
-  if(s==='on'){d.className='ok';l.textContent='connected';b.textContent='Disconnect';b.className='d';}
-  else if(s==='c'){d.className='w';l.textContent='connecting';b.textContent='Cancel';b.className='';}
-  else{d.className='';l.textContent='not connected';b.textContent='Connect';b.className='p';}
+// ── Playback controls ─────────────────────────────────────────────────────────
+function playToggle(){
+  if(!points.length) return;
+  if(playIdx >= points.length-1){ playIdx=0; trail=[]; hasDot=false; }
+  playing = !playing;
+  accumulated = 0;
+  document.getElementById('bplay').textContent = playing?'pause':'play';
+  lastWall = playing ? performance.now() : null;
 }
 
-function toggleConn(){
-  if(client&&client.connected){client.end();setCS('off');log('disconnected');return;}
-  const h=document.getElementById('host').value.trim();
-  const p=document.getElementById('port').value.trim();
-  setCS('c');log('connecting to '+h+':'+p);
-  client=mqtt.connect('ws://'+h+':'+p+'/mqtt',{
-    clientId:'rtls-'+Math.random().toString(16).slice(2,8),
-    connectTimeout:6000,reconnectPeriod:0
-  });
-  client.on('connect',()=>{
-    setCS('on');log('connected');
-    client.subscribe(TOPIC,e=>e?log('subscribe failed',true):log('receiving '+TOPIC));
-  });
-  client.on('message',(_,msg)=>{
-    try{const d=JSON.parse(msg.toString());onPoint(+d.x,+d.y,+d.ts);}
-    catch(e){log('bad message',true);}
-  });
-  client.on('error',e=>{log('error: '+e.message,true);setCS('off');});
-  client.on('close',()=>{if(document.getElementById('cdot').className==='ok'){setCS('off');log('connection lost');}});
+function scrub(idx){
+  playing = false;
+  accumulated = 0;
+  document.getElementById('bplay').textContent = 'play';
+  lastWall = null;
+  playIdx = idx;
+  trail = points.slice(Math.max(0,idx-TRAIL),idx+1).map(p=>({x:p.x,y:p.y}));
+  updatePlayState(idx);
 }
 
-function clearAll(){
-  trail=[];allPts=0;hasDot=false;msgTimes=[];
+// ── InfluxDB fetch ────────────────────────────────────────────────────────────
+async function fetchData(){
+  const host   = document.getElementById('ihost').value.trim();
+  const token  = 'Cy8WCQlrCRn_qn4w57C79w8KCx7hF4YQjZTk7Ao8oYDGql9ikBUy_frZZoi7qNbxkkGn721DNRS4sIHjhoWE-g=='
+  const org    = document.getElementById('iorg').value.trim();
+  const bucket = document.getElementById('ibucket').value.trim();
+  const start  = document.getElementById('qstart').value;
+  const dur    = parseFloat(document.getElementById('qdur').value)||60;
+
+  if(!start){ console.log('pick a start time first', true); return; }
+
+  const startISO = start.length === 16 ? start + ':00Z' : start + 'Z';
+const stopISO  = new Date(new Date(startISO).getTime() + dur*60000).toISOString();
+
+  const query = `
+from(bucket: "${bucket}")
+  |> range(start: ${startISO}, stop: ${stopISO})
+  |> filter(fn: (r) => r._measurement == "position")
+  |> filter(fn: (r) => r._field == "x" or r._field == "y")
+  |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
+  |> sort(columns: ["_time"])
+`.trim();
+
+  document.getElementById('bfetch').disabled = true;
+  document.getElementById('qstatus').textContent = 'loading...';
+  console.log('querying '+startISO+' for '+dur+'min');
+
+  try {
+    const res = await fetch(`${host}/api/v2/query?org=${encodeURIComponent(org)}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/vnd.flux',
+        'Accept': 'application/csv'
+      },
+      body: query
+    });
+
+    if(!res.ok){
+      const txt = await res.text();
+      throw new Error(`HTTP ${res.status}: ${txt.slice(0,120)}`);
+    }
+
+    const csv = await res.text();
+    const parsed = parseCSV(csv);
+    console.log(parsed);
+
+    if(!parsed.length){
+      document.getElementById('qstatus').textContent = 'no data in that range';
+      console.log('no data found', true);
+      document.getElementById('bfetch').disabled = false;
+      return;
+    }
+
+    points  = parsed;
+    trail   = [];
+    hasDot  = false;
+    playIdx = 0;
+
+    const sl = document.getElementById('pslider');
+    sl.max   = points.length-1;
+    sl.value = 0;
+    sl.disabled = false;
+    document.getElementById('bplay').disabled = false;
+    document.getElementById('spts').textContent = points.length;
+    document.getElementById('qstatus').textContent =
+      `${points.length} points — ${fmtTime(points[0].ts_ms)} to ${fmtTime(points[points.length-1].ts_ms)}`;
+
+    updatePlayState(0);
+    console.log(`loaded ${points.length} points`);
+
+  } catch(e){
+    console.log('fetch error: '+e.message, true);
+    document.getElementById('qstatus').textContent = 'error — see console.log';
+  }
+
+  document.getElementById('bfetch').disabled = false;
+}
+
+// ── CSV parser for InfluxDB annotated CSV ─────────────────────────────────────
+function parseCSV(raw){
+  const lines = raw.split('\n')
+    .map(l => l.startsWith(',') ? l.substring(1) : l)
+    //.filter(l => l.trim() && !l.startsWith('#'));
+
+  for (let i=0; i<lines.length; i++){
+    if(lines[i].endsWith('\r')) lines[i] = lines[i].slice(0,-1);
+  }
+
+  if(lines.length < 2) return [];
+
+  // find the header line — it's the one containing '_time'
+  const headerIdx = lines.findIndex(l => l.includes('_time'));
+  if(headerIdx < 0){ console.log('no header found', true); return []; }
+
+  const headers = lines[headerIdx].split(',');
+  console.log(headers);
+  const ti = headers.indexOf('_time');
+  const xi = headers.indexOf('x');
+  const yi = headers.indexOf('y');
+  if(ti<0||xi<0||yi<0){ console.log('missing columns: '+headers.join(','), true); return []; }
+
+  const out = [];
+  for(let i = headerIdx+1; i < lines.length; i++){
+    const cols = lines[i].split(',');
+    if(cols.length < Math.max(ti,xi,yi)+1) continue;
+    if(cols[0] === 'result' || cols[0] === '') continue; // skip annotation rows
+    const ts_ms = new Date(cols[ti]).getTime();
+    const x     = parseFloat(cols[xi]);
+    const y     = parseFloat(cols[yi]);
+    if(isNaN(ts_ms)||isNaN(x)||isNaN(y)) continue;
+    out.push({ts_ms, x, y});
+  }
+  return out.sort((a,b) => a.ts_ms - b.ts_ms);
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function resetAll(){
+  playing=false; lastWall=null;
+  points=[]; trail=[]; hasDot=false; playIdx=0;
+  document.getElementById('bplay').textContent='play';
+  document.getElementById('bplay').disabled=true;
+  document.getElementById('pslider').max=0;
+  document.getElementById('pslider').value=0;
+  document.getElementById('pslider').disabled=true;
+  document.getElementById('ttime').textContent='--:--:--.--';
   document.getElementById('spts').textContent='0';
-  document.getElementById('spd').textContent='-- mm/s';
-  log('cleared');
+  document.getElementById('qstatus').textContent='no data loaded';
+  document.getElementById('gap-badge').style.display='none';
+  console.log('reset');
 }
 
-function log(m,e=false){
-  const b=document.getElementById('logbox'),el=document.createElement('div');
-  el.className=e?'le':'ll';
+// ── log ───────────────────────────────────────────────────────────────────────
+function log(m,e=false,w=false){
+  const b=document.getElementById('console.logbox'),el=document.createElement('div');
+  el.className=e?'le':w?'lw':'ll';
   el.textContent='['+new Date().toTimeString().slice(0,8)+'] '+m;
-  b.prepend(el);while(b.children.length>60)b.removeChild(b.lastChild);
+  b.prepend(el);while(b.children.length>80)b.removeChild(b.lastChild);
 }
 
-resize();requestAnimationFrame(frame);
+resize();
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
