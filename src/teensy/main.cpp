@@ -43,23 +43,23 @@ void loop() {
     dists[2] = temp;
     delay(SENSOR_READ_DELAY_MS);
 
-    if ((temp = read_sensor(3)) < 0) {
-        Serial.println("Error reading sensor 3.");
-        return;
-    }
-    dists[3] = temp;
-    delay(SENSOR_READ_DELAY_MS);
+    // if ((temp = read_sensor(3)) < 0) {
+    //     Serial.println("Error reading sensor 3.");
+    //     return;
+    // }
+    // dists[3] = temp;
+    // delay(SENSOR_READ_DELAY_MS);
 
-    if (position_mle(dists, pos) < 0) {
+    if (position_trilateration(dists, pos) < 0) {
         Serial.println("Error computing position with MLE");
         return;
     }
 
-    Serial.printf("Distances: %u, %u, %u, %u.\n", dists[0], dists[1], dists[2], dists[3]);
+    Serial.printf("Distances: %u, %u, %u, %u.\n", dists[0], dists[1], dists[2]);
     Serial.printf("Estimated position: %f, %f. Error from true position: %f.\n",
         pos[0], pos[1], sqrtf((pos[0] - 750) * (pos[0] - 750) + (pos[1] - 750) * (pos[1] - 750)));
-    log_timepos(timestamp, pos);
 
+    log_timepos(timestamp, pos);
     timestamp++;
     delay(500);
 }

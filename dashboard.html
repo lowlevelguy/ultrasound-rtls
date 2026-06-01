@@ -374,7 +374,7 @@ function scrub(idx){
 // ── InfluxDB fetch ────────────────────────────────────────────────────────────
 async function fetchData(){
   const host   = document.getElementById('ihost').value.trim();
-  const token  = 'yJ-l2Q3l4Bc_UzBucTFAPer_1nbqmtAowdyM_2FrfxWKN5EFuYEOzWYwJr45ll2-Q0sS-mVk7AcVFgy0XQC-mw=='
+  const token  = 'MS5bvdE6EeY6hktc3Tq12dfN1hjUIEq5UsWeWpl5_nbim3nk85_ox6kV8lycLKMUYGJPKCOK40ZF3p6BEVLZuA=='
   const org    = document.getElementById('iorg').value.trim();
   const bucket = document.getElementById('ibucket').value.trim();
   const start  = document.getElementById('qstart').value;
@@ -387,7 +387,7 @@ const stopISO  = new Date(new Date(startISO).getTime() + dur*60000).toISOString(
 
   const query = `
 from(bucket: "${bucket}")
-  |> range(start: ${startISO}, stop: ${stopISO})
+  |> range(start: 0)
   |> filter(fn: (r) => r._measurement == "position")
   |> filter(fn: (r) => r._field == "x" or r._field == "y")
   |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
