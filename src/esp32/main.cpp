@@ -1,27 +1,14 @@
 #include <Arduino.h>
 #include <LittleFS.h>
-#include "esp32/log_local.h"
-#include "esp32/log_cloud.h"
 #include "esp32/config.h"
-
-static QueueHandle_t cloud_queue = NULL;
-
-static void cloud_task(void* param) {
-    if (cloud_begin() != 0) {
-        Serial.println("[cloud] init failed, task stopped");
-        vTaskDelete(NULL);
-        return;
-    }
-    log_queue_entry_t entry;
-    while (true) {
-        if (xQueueReceive(cloud_queue, &entry, pdMS_TO_TICKS(100)) == pdTRUE) {
-            const float pos[2] = { entry.x, entry.y };
-            if (cloud_publish((uint32_t)entry.timestamp, pos) != 0)
-                Serial.println("[cloud] publish failed");
-        }
-        cloud_loop();
-    }
-}
+#include "esp32/log.h"
+#include <PubSubClient.h>
+#include <WiFi.h>
+#include<math.h>
+bool received_response = false;
+bool sent_request = false;
+WiFiClient   wifi_client;
+PubSubClient mqtt_client(wifi_client);
 
 void monitor_task(void* param) {
     while(1) {
@@ -43,10 +30,6 @@ void setup() {
     Serial.begin(115200);
     esplog_serial->begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
     LittleFS.begin(true);
-    initialize_log_file(&LittleFS);
-
-    cloud_queue = xQueueCreate(20, sizeof(log_queue_entry_t));
-    set_cloud_queue(cloud_queue);
 
     xTaskCreate(
         logger_task,
@@ -72,16 +55,4 @@ void setup() {
         1, 
         nullptr
     );
-    xTaskCreatePinnedToCore(
-        cloud_task,
-        "cloud",
-        8192,
-        nullptr,
-        1,
-        nullptr,
-        0
-    );
 }
-
-
-void loop() {}
