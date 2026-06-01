@@ -16,7 +16,9 @@ extern TaskHandle_t logger_handle;
 extern TaskHandle_t uart_handle;
 extern uint32_t last_db_entry;
 extern TaskHandle_t flush_to_db_handle;
+extern TaskHandle_t get_db_last_entry_handle;
 extern SemaphoreHandle_t file_mutex;
+extern SemaphoreHandle_t mqtt_mutex;
 
 typedef struct {
     uint32_t timestamp;

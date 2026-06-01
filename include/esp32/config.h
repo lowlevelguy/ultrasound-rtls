@@ -14,5 +14,5 @@ inline HardwareSerial *esplog_serial = &Serial2;
 #define MQTT_TOPIC       "rtls/position/raw"
 #define MQTT_TOPIC_REQUEST "rtls/position/request"
 #define MQTT_TOPIC_RESPONSE "rtls/position/response"
-#define DB_FLUSH_PEORIOD 5000
+#define DB_FLUSH_PEORIOD 30000
 #define MQTT_CLIENT_ID   "rtls-esp32"

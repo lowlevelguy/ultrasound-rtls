@@ -10,6 +10,7 @@ TaskHandle_t uart_handle = NULL;
 SemaphoreHandle_t file_mutex = NULL;
 static uint32_t bad_pkts_counter = 0;
 
+
 // saves the contents of the queue to the log file, returns 0 on success and -1 on failure
 static int save_to_file(fs::FS *file_s, uint32_t curr_full_queue) {
 
@@ -48,9 +49,9 @@ static void log_local_push(const float* pos, const uint32_t timestamp) {
     if(idx+1 >= QUEUE_SIZE) {
         Serial.printf("queue full\n");
         uint32_t curr_full_queue = curr_queue.load();
+        queue_index.store(0);
         curr_queue.fetch_xor(1);
         xTaskNotify(logger_handle, curr_full_queue, eSetValueWithOverwrite);
-        queue_index.store(0);
     }
 }
 
