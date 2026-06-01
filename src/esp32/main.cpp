@@ -57,6 +57,7 @@ void setup()
     file_mutex = xSemaphoreCreateMutex();
     mqtt_mutex = xSemaphoreCreateMutex();
     
+    
     while(cloud_begin() != 0);
 
     xTaskCreate(
