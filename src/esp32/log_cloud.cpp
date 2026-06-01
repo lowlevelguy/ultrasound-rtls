@@ -108,6 +108,10 @@ int  cloud_publish(timepos_t* tp, size_t tp_size) {
     return 0;
 }
 
+bool client_connected() {
+    return mqtt_client.connected();
+}
+
 void cloud_loop() {
     if (mqtt_client.connected())
         mqtt_client.loop();

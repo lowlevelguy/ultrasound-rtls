@@ -46,3 +46,4 @@ void cloud_loop();
 void get_db_last_entry(void* param);
 void flush_to_db(void* param);
 void callback(char* topic, byte* message, unsigned int length);
+bool client_connected();

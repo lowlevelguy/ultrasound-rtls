@@ -27,7 +27,7 @@ void monitor_task(void *param)
         }
 
         // mqtt status
-        Serial.printf("[mqtt]  status: %s\n", mqtt_client.connected() ? "connected" : "disconnected");
+        Serial.printf("[mqtt]  status: %s\n", client_connected() ? "connected" : "disconnected");
         Serial.printf("[mqtt]  last_db_entry: %u\n", last_db_entry);
 
         // file status
