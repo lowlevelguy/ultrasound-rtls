@@ -10,6 +10,7 @@
 #define EPS_DET 1e-6f
 #define STEP_GN 1e-2f
 #define MAX_ITERATIONS_GN 8
+#define MAX_ITERATIONS_GN3 16
 
 
 /********** HELPER FUNCTIONS **********/
@@ -325,6 +326,56 @@ int position_mle(const uint16_t* dist, float* pos) {
         // Compute (J^T J)^{-1} J^T and right-multiply it by f(point)
         matmat_mult(JtJ_inv, 2, 2, Jt, 4, full_matrix);
         matvec_mult(full_matrix, 2, 4, val, val_tf);
+
+        // Update point
+        point[0] -= val_tf[0];
+        point[1] -= val_tf[1];
+
+        dist_err(point, dist, val);
+    }
+
+    pos[0] = point[0];
+    pos[1] = point[1];
+    return 0;
+}
+
+int position_mle3(const uint16_t* dist, float* pos) {
+    // Perform Gauss-Newton to find the point with minimal squared error
+    float point[2] = {0}, point_shift[2],
+        val[3], val_shift[3], val_tf[2],
+        J[3*2], Jt[2*3], JtJ[2*2], JtJ_inv[2*2], full_matrix[2*3];
+
+    dist_err(point, dist, val);
+    for (int i = 0; i < MAX_ITERATIONS_GN3; i++) {
+        // Compute Jacobian and its transpose
+        point_shift[0] = point[0] + STEP_GN;
+        point_shift[1] = point[1];
+        dist_err(point_shift, dist, val_shift);
+        J[0] = (val_shift[0] - val[0]) / STEP_GN;
+        J[2] = (val_shift[1] - val[1]) / STEP_GN;
+        J[4] = (val_shift[2] - val[2]) / STEP_GN;
+        Jt[0] = (val_shift[0] - val[0]) / STEP_GN;
+        Jt[1] = (val_shift[1] - val[1]) / STEP_GN;
+        Jt[2] = (val_shift[2] - val[2]) / STEP_GN;
+
+        point_shift[0] = point[0];
+        point_shift[1] = point[1] + STEP_GN;
+        dist_err(point_shift, dist, val_shift);
+        J[1] = (val_shift[0] - val[0]) / STEP_GN;
+        J[3] = (val_shift[1] - val[1]) / STEP_GN;
+        J[5] = (val_shift[2] - val[2]) / STEP_GN;
+        Jt[3] = (val_shift[0] - val[0]) / STEP_GN;
+        Jt[4] = (val_shift[1] - val[1]) / STEP_GN;
+        Jt[5] = (val_shift[2] - val[2]) / STEP_GN;
+
+        // Compute (J^T J)^{-1}
+        matmat_mult(Jt, 2, 3, J, 2, JtJ);
+        if (mat2_inv(JtJ, JtJ_inv) == -1)
+            return -1;
+
+        // Compute (J^T J)^{-1} J^T and right-multiply it by f(point)
+        matmat_mult(JtJ_inv, 2, 2, Jt, 3, full_matrix);
+        matvec_mult(full_matrix, 2, 3, val, val_tf);
 
         // Update point
         point[0] -= val_tf[0];

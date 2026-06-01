@@ -124,3 +124,5 @@ int position_fgls(const uint16_t* dist, const float sigma_sq, float* pos);
   * Jacobian of the function (d(x) - dist).
   */
 int position_mle(const uint16_t* dist, float* pos);
+
+int position_mle3(const uint16_t* dist, float* pos);

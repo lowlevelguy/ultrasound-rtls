@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 #include "teensy/log.h"
 #include "teensy/config.h"
 
@@ -30,24 +32,26 @@ int log_timepos(uint32_t timestamp, float pos[2]) {
     unsigned long start = millis();
     while (tlog_serial->availableForWrite() < sizeof(log_packet_t)) {
         if (millis() - start > WRITE_TIMEOUT_MS)
-            return -1;
+            return ERROR_LOG_WRITE_TIMEOUT;
     }
 
     if (tlog_serial->write((uint8_t*)&log_packet, sizeof(log_packet_t))
         != sizeof(log_packet_t))
-        return -1;
+        return ERROR_LOG_WRITE_FAILURE;
 
     start = millis();
     while (tlog_serial->available() < sizeof(ack_packet_t)) {
         if (millis() - start > ACK_TIMEOUT_MS)
-            return -1;
+            return ERROR_LOG_ACK_TIMEOUT;
     }
 
     if (tlog_serial->readBytes((uint8_t*)&ack_packet, sizeof(ack_packet_t))
         != sizeof(ack_packet_t))
-        return -1;
+        return ERROR_LOG_READ_FAILURE;
 
-    if (ack_packet.start != START_BYTE || ack_packet.timestamp != timestamp)
-        return -1;
+    if (ack_packet.start != START_BYTE || ack_packet.timestamp != timestamp) {
+        Serial.printf("Ack: %x %u\n", ack_packet.start, ack_packet.timestamp);
+        return ERROR_LOG_ACK_INVALID;
+    }
     return 0;
 }

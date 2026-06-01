@@ -1,6 +1,13 @@
 #pragma once
 #include <stdint.h>
+
 #define START_BYTE 0xAA
+
+#define ERROR_LOG_WRITE_TIMEOUT     -1
+#define ERROR_LOG_WRITE_FAILURE     -2
+#define ERROR_LOG_ACK_TIMEOUT       -3
+#define ERROR_LOG_READ_FAILURE      -4
+#define ERROR_LOG_ACK_INVALID       -5
 
 typedef struct {
     uint8_t start;

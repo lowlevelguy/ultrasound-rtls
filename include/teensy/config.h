@@ -4,9 +4,9 @@
 #define CONFIG_ANCHOR_POS
 inline constexpr float anchor_pos[4][2] = {
     {0, 0},
-    {4000, 0},
-    {0, 4000},
-    {4000, 4000}
+    {1500, 0},
+    {0, 1500},
+    {1500, 1500},
 };
 
 #define CONFIG_SENSORS
@@ -33,7 +33,7 @@ inline sensor_t sensors[4] = {
     {{.type = SerialHandle_t::HW, .hw = &Serial1}, 0x01, &s1_correct, &highlow_checksum},
     {{.type = SerialHandle_t::HW, .hw = &Serial2}, 0x01, &s2_correct, &highlow_checksum},
     {{.type = SerialHandle_t::HW, .hw = &Serial3}, 0x01, &s3_correct, &highlow_checksum},
-    {{.type = SerialHandle_t::HW, .hw = &Serial4}, 0x55, &s4_correct, &starthighlow_checksum}
+    {{.type = SerialHandle_t::HW, .hw = &Serial4}, 0x55, &s4_correct, &starthighlow_checksum},
 };
 
 #define CONFIG_TLOG_SERIAL

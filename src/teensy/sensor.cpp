@@ -61,20 +61,20 @@ int32_t read_sensor(int sensor_index) {
     unsigned long start = millis();
     while (sensor_available(sensors[sensor_index].serial) < 4) {
         if ((millis() - start) > MAX_WAIT_TIME_MS)
-            return -1;
+            return -2;
     }
 
     uint8_t buffer[4];
     if (sensor_read_bytes(sensors[sensor_index].serial, buffer, 4) < 4)
-        return -1;
+        return -3;
 
     if (buffer[0] != 0xFF)
-        return -1;
+        return -4;
 
     uint8_t checksum = sensors[sensor_index].checksum(buffer[0], buffer[1], buffer[2]);
 
     if (checksum != buffer[3])
-        return -1;
+        return -5;
 
     float result = (float)((buffer[1] << 8) | buffer[2]);
     result = sensors[sensor_index].correct_error(result);

@@ -1,107 +1,62 @@
 #include <Arduino.h>
 
-#include "teensy/position.h"
 #include "teensy/config.h"
+#include "teensy/log.h"
+#include "teensy/position.h"
 
-float max_err, min_err, mean, variance;
+#define SENSOR_READ_DELAY_MS 10
 
-float rand_stdnormal();
-
-/* Teensy specific functions for cycle count */
-inline void enable_cyccounter() {
-    ARM_DEMCR |= ARM_DEMCR_TRCENA;
-    ARM_DWT_CTRL |= ARM_DWT_CTRL_CYCCNTENA;
-}
-
-inline uint32_t get_cyccount() {
-    return ARM_DWT_CYCCNT;
-}
-
+uint16_t dists[4];
+float pos[2];
+uint32_t timestamp = 0;
 void setup() {
-    enable_cyccounter();
     Serial.begin(115200);
 
-    // Generate inputs
-    const float sigma = 5;
-    float true_pos[2], pos[2],
-        pos_err[500];
-        //cycle_counts[301];
-    uint32_t start_cycle;
-    uint16_t dists[4];
-    for (int i = 0; i < 500; i++) {
-        true_pos[0] = (float)rand() / (float)RAND_MAX * 4000;
-        true_pos[1] = (float)rand() / (float)RAND_MAX * 4000;
+    sensor_begin(0, 9600);
+    sensor_begin(1, 9600);
+    sensor_begin(2, 9600);
+    sensor_begin(3, 9600);
 
-        dists[0] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[0][0]) * (true_pos[0] - anchor_pos[0][0])
-                 + (true_pos[1] - anchor_pos[0][1]) * (true_pos[1] - anchor_pos[0][1]));
-        dists[0] += (uint16_t)(sigma * rand_stdnormal());
-
-        dists[1] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[1][0]) * (true_pos[0] - anchor_pos[1][0])
-                 + (true_pos[1] - anchor_pos[1][1]) * (true_pos[1] - anchor_pos[1][1]));
-        dists[1] += (uint16_t)(sigma * rand_stdnormal());
-
-        dists[2] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[2][0]) * (true_pos[0] - anchor_pos[2][0])
-                 + (true_pos[1] - anchor_pos[2][1]) * (true_pos[1] - anchor_pos[2][1]));
-        dists[2] += (uint16_t)(sigma * rand_stdnormal());
-
-        dists[3] = (uint16_t)sqrtf((true_pos[0] - anchor_pos[3][0]) * (true_pos[0] - anchor_pos[3][0])
-                 + (true_pos[1] - anchor_pos[3][1]) * (true_pos[1] - anchor_pos[3][1]));
-        dists[3] += (uint16_t)(sigma * rand_stdnormal());
-
-//        position_fgls(dists, sigma*sigma, pos);
-        position_fgls(dists, sigma*sigma, pos);
-        pos_err[i] = sqrtf((pos[0] - true_pos[0]) * (pos[0] - true_pos[0])
-            + (pos[1] - true_pos[1]) * (pos[1] - true_pos[1]));
-    }
-
-    // Stats for position estimation accuracy
-    max_err = pos_err[0];
-    min_err = pos_err[0];
-    mean = pos_err[0];
-    for (int i = 1; i < 500; i++) {
-        if (pos_err[i] > max_err)
-            max_err = pos_err[i];
-        if (pos_err[i] < min_err)
-            min_err = pos_err[i];
-        mean += pos_err[i];
-    }
-    mean /= 500;
-
-    variance = 0;
-    for (int i = 0; i < 500; i++) {
-        variance += (pos_err[i] - mean) * (pos_err[i] - mean);
-    }
-    variance /= 500;
+    tlog_serial->begin(9600);
 }
 
 void loop() {
-    delay(1000);
-    Serial.printf("Min error:      %.2f mm\n", min_err);
-    Serial.printf("Max error:      %.2f mm\n", max_err);
-    Serial.printf("Mean error:     %.2f mm\n", mean);
-    Serial.printf("Std dev error:  %.2f mm\n", sqrtf(variance));
-}
+    int32_t temp;
+    if ((temp = read_sensor(0)) < 0) {
+        Serial.println("Error reading sensor 0.");
+        return;
+    }
+    dists[0] = temp;
+    delay(SENSOR_READ_DELAY_MS);
 
-float rand_stdnormal() {
-    static int hasSpare = 0;
-    static float spare;
+    if ((temp = read_sensor(1)) < 0) {
+        Serial.println("Error reading sensor 1.");
+        return;
+    }
+    dists[1] = temp;
+    delay(SENSOR_READ_DELAY_MS);
 
-    if (hasSpare) {
-        hasSpare = 0;
-        return spare;
+    if ((temp = read_sensor(2)) < 0) {
+        Serial.println("Error reading sensor 2.");
+        return;
+    }
+    dists[2] = temp;
+    delay(SENSOR_READ_DELAY_MS);
+
+    if ((temp = read_sensor(3)) < 0) {
+        Serial.println("Error reading sensor 3.");
+        return;
+    }
+    dists[3] = temp;
+    delay(SENSOR_READ_DELAY_MS);
+
+    if (position_mle(dists, pos) < 0) {
+        Serial.println("Error computing position with MLE");
+        return;
     }
 
-    hasSpare = 1;
+    log_timepos(timestamp, pos);
 
-    float u, v, s;
-    do {
-        u = ((float)rand() / ((float) RAND_MAX)) * 2.0 - 1.0;
-        v = ((float)rand() / ((float) RAND_MAX)) * 2.0 - 1.0;
-        s = u * u + v * v;
-    } while (s >= 1.0 || s == 0.0);
-
-    s = sqrtf(-2.0 * logf(s) / s);
-    spare = v * s;
-
-    return u * s;
+    timestamp++;
+    delay(500);
 }
