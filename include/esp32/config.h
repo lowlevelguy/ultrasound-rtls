@@ -6,10 +6,10 @@
 
 inline HardwareSerial *esplog_serial = &Serial2;
 
-#define WIFI_SSID        "TUNISIETELECOM-2.4G-M4c6"
-#define WIFI_PASSWORD    "Ec6YgkGm"
+#define WIFI_SSID        "SL2"
+#define WIFI_PASSWORD    ""
 #define MAX_RESPONSE_TIMEOUT 2000
-#define MQTT_BROKER_IP   "192.168.100.14"
+#define MQTT_BROKER_IP   "172.18.183.71"
 #define MQTT_BROKER_PORT 1883
 #define MQTT_TOPIC       "rtls/position/raw"
 #define MQTT_TOPIC_REQUEST "rtls/position/request"

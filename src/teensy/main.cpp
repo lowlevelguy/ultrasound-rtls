@@ -55,6 +55,9 @@ void loop() {
         return;
     }
 
+    Serial.printf("Distances: %u, %u, %u, %u.\n", dists[0], dists[1], dists[2], dists[3]);
+    Serial.printf("Estimated position: %f, %f. Error from true position: %f.\n",
+        pos[0], pos[1], sqrtf((pos[0] - 750) * (pos[0] - 750) + (pos[1] - 750) * (pos[1] - 750)));
     log_timepos(timestamp, pos);
 
     timestamp++;
