@@ -3,7 +3,7 @@ This repository contains all the necessary code for the implementation of a prot
 
 ---
 
-## Prerequisites
+## Components
 This prototype consists of four different components:
 - a position tracker: running on a Teensy 4.0
 - a history logger: running on an ESP32
@@ -136,7 +136,7 @@ We also added a simple system monitoring task, executing once every 5 seconds, p
 - WiFi status: connected or disconnected, IP address and RSSI.
 - MQTT status: connected or disconnected, last database entry
 
-    ### Server
+### Server
 The server runs a Mosquitto server as an MQTT broker (configuration: `server/mosquitto.conf`), an InfluxDB server (with org `rtls` and bucket `positions`), a Telegraf server agent (configuration: `server/telegraf.conf`), and a custom python translation script `server/bridge.py`.
 
 The Telegraf agent listens on the MQTT topic `rtls/position`, and forwards all incoming towards the InfluxDB. Hence, all incoming to said topic must be of a format supported by InfluxDB; namely JSON, CSV or the InfluxDB custom format.
