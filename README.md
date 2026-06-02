@@ -136,5 +136,18 @@ We also added a simple system monitoring task, executing once every 5 seconds, p
 - WiFi status: connected or disconnected, IP address and RSSI.
 - MQTT status: connected or disconnected, last database entry
 
-### Server
-The server runs a Mosquitto server as an MQTT broker (configuration: `server/mosquitto.conf`), an InfluxDB server, a Telegraf server agent (configuration: `server/telegraf.conf`), and a custom python translation script.
+    ### Server
+The server runs a Mosquitto server as an MQTT broker (configuration: `server/mosquitto.conf`), an InfluxDB server (with org `rtls` and bucket `positions`), a Telegraf server agent (configuration: `server/telegraf.conf`), and a custom python translation script `server/bridge.py`.
+
+The Telegraf agent listens on the MQTT topic `rtls/position`, and forwards all incoming towards the InfluxDB. Hence, all incoming to said topic must be of a format supported by InfluxDB; namely JSON, CSV or the InfluxDB custom format.
+
+This is one place where the python bridge comes in: it listens on `rtls/position/raw`, where the ESP32 publishes. It iterates through the blob 12 bytes at a time, unpacking the binary format. Then, it serialises to JSON, and publishes to `rtls/position` for the Telegraf to forward.
+
+Additionally, the python bridge listens on `rtls/position/request` for the ESP32's last database entry requests. When the ESP32 publishes a request, the bridge queries the server for the last entry's timestamp, which it then proceeds to pack as `uint32_t` and publish to `rtls/position/response`.
+
+For our prototype, we setup one of our PCs on the LAN as the server.
+
+### Dashboard
+The dashboard expects the user to provide the InfluxDB server's address and port, as well as the organisation and bucket. The user then inputs the time period he wishes to replay as start time and duration. A playback section is provided to allow the user to control the playback speed, pause and play, rewind and fastforward, and see the exact coordinates as time goes on.
+
+![Dashboard Preview](assets/dashboard.png)

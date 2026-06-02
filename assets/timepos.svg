@@ -6,6 +6,7 @@
       fill: #222;
     }
     .type {
+      fill: #f00;
       text-anchor: middle;
     }
     .field {
@@ -15,9 +16,9 @@
   </style>
 
   <!-- Types -->
-  <text class="type" x="0"   y="20">uint32_t</text>
-  <text class="type" x="150"   y="20">float</text>
-  <text class="type" x="300"   y="20">float</text>
+  <text class="type" x="75"   y="20">uint32_t</text>
+  <text class="type" x="225"   y="20">float</text>
+  <text class="type" x="375"   y="20">float</text>
 
   <!-- Fields -->
   <rect x="0"  y="30" width="150" height="35" fill="#d8ead3" stroke="#000"/>
@@ -25,8 +26,8 @@
   <rect x="300" y="30" width="150" height="35" fill="#efe3d3" stroke="#000"/>
 
   <!-- Labels -->
-  <text class="field" x="150"   y="47.5">timestamp</text>
-  <text class="field" x="300"   y="47.5">position.x</text>
-  <text class="field" x="450"   y="47.5">position.y</text>
+  <text class="field" x="75"   y="47.5">timestamp</text>
+  <text class="field" x="225"   y="47.5">position.x</text>
+  <text class="field" x="375"   y="47.5">position.y</text>
 </svg>
 

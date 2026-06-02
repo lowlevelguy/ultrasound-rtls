@@ -6,6 +6,7 @@
       fill: #222;
     }
     .type {
+      fill: #f00;
       text-anchor: middle;
     }
     .field {
