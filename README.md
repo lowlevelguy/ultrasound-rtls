@@ -96,72 +96,14 @@ The Teensy 4.0 makes no persistent storage of the time-position history within o
 #### Log Packet
 The Teensy sends the data packed into the following 14 byte format:
 
-<div style="display:flex;justify-content:center;font-family:monospace">
-    <div style="display:flex; flex-direction:column">
-        <div style="padding:5px;text-align:center">
-            uint8_t
-        </div>
-        <div style="padding:5px;border:1px solid;width:75px;text-align:center;background-color:#d8d8f0">
-            start
-        </div>
-    </div>
-    <div style="display:flex; flex-direction:column">
-        <div style="padding:5px;text-align:center">
-            uint32_t
-        </div>
-        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#d8ead3">
-            timestamp
-        </div>
-    </div>
-    <div style="display:flex; flex-direction:column">
-        <div style="padding:5px;text-align:center">
-            float
-        </div>
-        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#efe3d3">
-            position.x
-        </div>
-    </div>
-    <div style="display:flex; flex-direction:column">
-        <div style="padding:5px;text-align:center">
-            float
-        </div>
-        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#efe3d3">
-            position.y
-        </div>
-    </div>
-    <div style="display:flex; flex-direction:column">
-        <div style="padding:5px;text-align:center">
-            uint8_t
-        </div>
-        <div style="padding:5px;border:1px solid;width:75px;text-align:center;background-color:#f4d6d6">
-            checksum
-        </div>
-    </div>
-</div>
+![Log Packet Layout](assets/log_packet.svg)
 
 We define the `start` byte to be of value `0xAA`. The `timestamp` is not a regular UNIX timestamp, rather it uses a custom time unit, depending on the rate of position sampling (e.g., 2 times per second => unit 0.5s), and a custom reference time 0 (e.g. 00:00:00.0 AM, Jan 1st 2020). Finally, the `checksum` is computed as the sum of `timestamp` and both `position.x` and `position.y` interpreted as arrays of `uint8_t`s, rather than IEEE floats.
 
 #### Ack Packet
 Upon receiving a log packet, the ESP32 is expected to send back an acknowledgement packet to successful proper reception. This is crucial for debugging the integrity of the UART link. The ack packet is 5 bytes long, of the following format:
 
-<div style="display:flex;justify-content:center;font-family:monospace">
-    <div style="display:flex; flex-direction:column">
-        <div style="padding:5px;text-align:center">
-            uint8_t
-        </div>
-        <div style="padding:5px;border:1px solid;width:75px;text-align:center;background-color:#d8d8f0">
-            start
-        </div>
-    </div>
-    <div style="display:flex; flex-direction:column">
-        <div style="padding:5px;text-align:center">
-            uint32_t
-        </div>
-        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#d8ead3">
-            timestamp
-        </div>
-    </div>
-</div>
+![Ack Packet Layout](assets/ack_packet.svg)
 
 Again, we define `start` to have value `0xAA`. The `timestamp` then must match that of the log packet being acknowledged.
 
@@ -174,32 +116,7 @@ We use an off-brand ESP32 board built around the ESP32 Wrover SoC. As such, it c
 #### Local Logging
 The board is not guaranteed to be able to reach the cloud database at all times: its own internet connection could drop, or the server could have downtime. Hence, it must implement some kind of local persistent storage to not lose the data in case of failure to reach the database. We choose to have it simply save the time-position history to a local file: `/history.log`. We use a simple binary format:
 
-<div style="display:flex;justify-content:center;font-family:monospace">
-    <div style="display:flex; flex-direction:column">
-        <div style="padding:5px;text-align:center">
-            uint32_t
-        </div>
-        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#d8ead3">
-            timestamp
-        </div>
-    </div>
-    <div style="display:flex; flex-direction:column">
-        <div style="padding:5px;text-align:center">
-            float
-        </div>
-        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#efe3d3">
-            position.x
-        </div>
-    </div>
-    <div style="display:flex; flex-direction:column">
-        <div style="padding:5px;text-align:center">
-            float
-        </div>
-        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#efe3d3">
-            position.y
-        </div>
-    </div>
-</div>
+![Time-Position Struct](assets/timepos.svg)
 
 This format is not only easily parsable on the ESP32, but also allows for easy timestamp-indexed lookups; as opposed to a CSV or JSON storage format, which would cause the time-position entries to vary in size, and hence hinder the possibility of any fast lookups.
 

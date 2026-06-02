@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="225" height="70" viewBox="0 0 225 70">
+  <style>
+    text {
+      font-family: monospace;
+      font-size: 14px;
+      fill: #222;
+    }
+    .type {
+      text-anchor: middle;
+    }
+    .field {
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+  </style>
+
+  <!-- Types -->
+  <text class="type" x="37.5"  y="20">uint8_t</text>
+  <text class="type" x="150"   y="20">uint32_t</text>
+
+  <!-- Fields -->
+  <rect x="0"   y="30" width="75"  height="35" fill="#d8d8f0" stroke="#000"/>
+  <rect x="75"  y="30" width="150" height="35" fill="#d8ead3" stroke="#000"/>
+
+  <!-- Labels -->
+  <text class="field" x="37.5"  y="47.5">start</text>
+  <text class="field" x="150"   y="47.5">timestamp</text>
+</svg>
+
