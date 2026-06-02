@@ -1,6 +1,8 @@
 # Ultrasound-Based Indoors Real-Time Location System
 This repository contains all the necessary code for the implementation of a prototype 2D Real-Time Location System (RTLS) with time-position history storage on a cloud database and a web interface for playback.
 
+---
+
 ## Prerequisites
 This prototype consists of four different components:
 - a position tracker: running on a Teensy 4.0
@@ -9,6 +11,8 @@ This prototype consists of four different components:
 - an HTML/JS interface (`dashboard.html`)
 
 Moreover, the position tracker expects at least 3 ultrasound ranging modules, communicating over UART, to function.
+
+---
 
 ## Running
 To build, upload and monitor the tracker component:
@@ -33,7 +37,9 @@ python3 -m http.server 8080
 ```
 and open `localhost:8080`.
 
-## Description
+---
+
+## Description: Hardware and Firmware
 ### Position Tracker
 This component, running on a [Teensy 4.0](https://www.pjrc.com/store/teensy40.html), is tasked with collecting distance information from 3 or 4 ultrasound ranging modules (depending on your configuration). The main reason for this choice of board is its 7 hardware UART interfaces, sufficient to drive our ranging modules.
 
@@ -79,6 +85,139 @@ Likewise, below are the error benchmarks, taken over 500 iterations, for simulat
 | MLE-4 (4 Gauss-Newton iterations) |       4.17      |          2.28           |
 | MLE-3 (8 Guass-Newton iterations) |       2.86      |          2.57           |
 
-### ESP32
+#### Configuration
+We attempted to write our firmware to be as library-like as possible. As a result, we want the distance reading module to be written in a manner agnostic to: which of the sensors are AJ-SR04M and which are SR04M-2, which UART interface is used by which sensor and what calibration method is suited for each sensor. Likewise, the positioning module should be agnostic to the physical sensor positions.
+
+However, if these variables were to simply be passed to the modules as parameters at runtime, we would lose out on some optimization opportunities. Namely, we make the assumption that all of these previously mentioned variables are fixed throughout the program's operation. Hence, we made it so all of these configuration variables are to all be defined within one single `teensy/config.h` file. In the case of a missing variable definition, the compiler will throw an error during the preprocessing stage. All of the modules subsequently include this configuration file, allowing notably for many `constexpr` optimizations in the positioning module.
+
+### Inter-Board Communication
+The Teensy 4.0 makes no persistent storage of the time-position history within our architecture. Rather, as soon as the current position is estimated, it is immediately communicated to the ESP32 board, which then handles all the persistent storage. This happens over a UART link (9600 baud rate), following a simple protocol we designed.
+
+#### Log Packet
+The Teensy sends the data packed into the following 14 byte format:
+
+<div style="display:flex;justify-content:center;font-family:monospace">
+    <div style="display:flex; flex-direction:column">
+        <div style="padding:5px;text-align:center">
+            uint8_t
+        </div>
+        <div style="padding:5px;border:1px solid;width:75px;text-align:center;background-color:#d8d8f0">
+            start
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column">
+        <div style="padding:5px;text-align:center">
+            uint32_t
+        </div>
+        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#d8ead3">
+            timestamp
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column">
+        <div style="padding:5px;text-align:center">
+            float
+        </div>
+        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#efe3d3">
+            position.x
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column">
+        <div style="padding:5px;text-align:center">
+            float
+        </div>
+        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#efe3d3">
+            position.y
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column">
+        <div style="padding:5px;text-align:center">
+            uint8_t
+        </div>
+        <div style="padding:5px;border:1px solid;width:75px;text-align:center;background-color:#f4d6d6">
+            checksum
+        </div>
+    </div>
+</div>
+
+We define the `start` byte to be of value `0xAA`. The `timestamp` is not a regular UNIX timestamp, rather it uses a custom time unit, depending on the rate of position sampling (e.g., 2 times per second => unit 0.5s), and a custom reference time 0 (e.g. 00:00:00.0 AM, Jan 1st 2020). Finally, the `checksum` is computed as the sum of `timestamp` and both `position.x` and `position.y` interpreted as arrays of `uint8_t`s, rather than IEEE floats.
+
+#### Ack Packet
+Upon receiving a log packet, the ESP32 is expected to send back an acknowledgement packet to successful proper reception. This is crucial for debugging the integrity of the UART link. The ack packet is 5 bytes long, of the following format:
+
+<div style="display:flex;justify-content:center;font-family:monospace">
+    <div style="display:flex; flex-direction:column">
+        <div style="padding:5px;text-align:center">
+            uint8_t
+        </div>
+        <div style="padding:5px;border:1px solid;width:75px;text-align:center;background-color:#d8d8f0">
+            start
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column">
+        <div style="padding:5px;text-align:center">
+            uint32_t
+        </div>
+        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#d8ead3">
+            timestamp
+        </div>
+    </div>
+</div>
+
+Again, we define `start` to have value `0xAA`. The `timestamp` then must match that of the log packet being acknowledged.
+
+#### Configuration
+The UART interface to be used for board-to-board communication is defined within the respective board's `config.h`.
+
+### History Logger
 We use an off-brand ESP32 board built around the ESP32 Wrover SoC. As such, it comes natively with Bluetooth and WiFi connectivity, the latter of which we need to make use of cloud databases.
 
+#### Local Logging
+The board is not guaranteed to be able to reach the cloud database at all times: its own internet connection could drop, or the server could have downtime. Hence, it must implement some kind of local persistent storage to not lose the data in case of failure to reach the database. We choose to have it simply save the time-position history to a local file: `/history.log`. We use a simple binary format:
+
+<div style="display:flex;justify-content:center;font-family:monospace">
+    <div style="display:flex; flex-direction:column">
+        <div style="padding:5px;text-align:center">
+            uint32_t
+        </div>
+        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#d8ead3">
+            timestamp
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column">
+        <div style="padding:5px;text-align:center">
+            float
+        </div>
+        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#efe3d3">
+            position.x
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column">
+        <div style="padding:5px;text-align:center">
+            float
+        </div>
+        <div style="padding:5px;border:1px solid;width:150px;text-align:center;background-color:#efe3d3">
+            position.y
+        </div>
+    </div>
+</div>
+
+This format is not only easily parsable on the ESP32, but also allows for easy timestamp-indexed lookups; as opposed to a CSV or JSON storage format, which would cause the time-position entries to vary in size, and hence hinder the possibility of any fast lookups.
+
+The ESP32 does not save to local storage as soon as it received a log packet however. Instead, it has two internal buffers meant for receiving log packets over UART; as soon as one buffer is filled, the receiving FreeRTOS task switches to using the other, while a concurrent FreeRTOS task wakes up and flushes the filled buffer to the local file. For this, we use a simple `xTaskNotifyWait()` and `xTaskNotifyGive()` pattern for the "buffer is full" event.
+
+The reason for such a buffered writing method is the relative expensiveness of file opening operations, as well as Flash memory operations in general.
+
+#### Cloud Logging
+Operations over the internet can have significant latency, and hence must be made conservatively. We define a task concurrent to the previous two, which runs once every `DB_FLUSH_PERIOD` seconds (defined in `esp32/config.h`). It attempts to synchronize the database with the local persistent storage using the following procedure:
+1. it fetches the timestamp of the last entry in the database
+2. it looks up the position of the corresponding entry within the local file
+3. it commits the succeeding entries from the local file to the database in batches of 20 via the MQTT topic `rtls/position/raw`.
+
+#### System Monitor
+We also added a simple system monitoring task, executing once every 5 seconds, printing out:
+- most stack space used by each task (`uxTaskGetStackHighWaterMark`) during the last 5 seconds
+- WiFi status: connected or disconnected, IP address and RSSI.
+- MQTT status: connected or disconnected, last database entry
+
+### Server
+The server runs a Mosquitto server as an MQTT broker (configuration: `server/mosquitto.conf`), an InfluxDB server, a Telegraf server agent (configuration: `server/telegraf.conf`), and a custom python translation script.
